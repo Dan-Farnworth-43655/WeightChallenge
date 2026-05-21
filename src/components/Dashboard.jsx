@@ -200,48 +200,46 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       </div>
 
-      {/* Horse race — competitors only (Josh excluded) */}
+      {/* Horse race — single shared track, competitors only (Josh excluded) */}
       {hasData && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold text-slate-400 flex items-center gap-1">
               <span>🏁</span> Race to the Finish
             </h3>
             <span className="text-[10px] uppercase tracking-wider text-slate-500">First to goal wins</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            {COMPETITORS.map(p => {
+          <div className="relative h-10 bg-slate-800/60 rounded-md overflow-visible">
+            {/* Center track line */}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-slate-700" />
+            {/* Horses — staggered vertical offsets so they don't fully overlap */}
+            {COMPETITORS.map((p, i) => {
               const s = allStats.find(st => st.participant.id === p.id)
               const pct = Math.max(0, Math.min(1, s?.pctToGoal ?? 0))
               const hasWon = pct >= 1
+              // 3 vertical positions: -10px, 0, +10px from center
+              const offsetY = (i - 1) * 10
               return (
-                <div key={p.id} className="relative h-7 bg-slate-800/60 rounded-md overflow-visible">
-                  {/* Tinted progress trail */}
+                <div
+                  key={p.id}
+                  className="absolute top-1/2 transition-all duration-500"
+                  style={{
+                    left: `calc(${pct * 100}% - 12px)`,
+                    transform: `translateY(calc(-50% + ${offsetY}px))`,
+                  }}
+                  title={`${p.name}: ${(pct * 100).toFixed(1)}% to goal`}
+                >
                   <div
-                    className="absolute inset-y-0 left-0 rounded-l-md transition-all duration-500"
-                    style={{ width: `${pct * 100}%`, backgroundColor: p.color + '22' }}
-                  />
-                  {/* Lane label */}
-                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider" style={{ color: p.color + 'AA' }}>
-                    {p.initials}
-                  </div>
-                  {/* Horse */}
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 transition-all duration-500"
-                    style={{ left: `calc(${pct * 100}% - 12px)` }}
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] shadow-lg border-2 border-white/80"
+                    style={{ backgroundColor: p.color }}
                   >
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] shadow-lg border-2 border-white/80"
-                      style={{ backgroundColor: p.color }}
-                    >
-                      {hasWon ? '👑' : '🐎'}
-                    </div>
+                    {hasWon ? '👑' : '🐎'}
                   </div>
-                  {/* Finish line */}
-                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 text-sm leading-none pointer-events-none">🏁</div>
                 </div>
               )
             })}
+            {/* Finish line */}
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 text-base leading-none pointer-events-none">🏁</div>
           </div>
         </div>
       )}
