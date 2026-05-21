@@ -22,15 +22,20 @@ export default function App() {
   }, [activeUser])
 
   const loadLogs = useCallback(async () => {
+    // Load logs and PRs independently — a failure in PRs must NOT block logs
     try {
-      const [data, prData] = await Promise.all([fetchLogs(), fetchPRs()])
+      const data = await fetchLogs()
       setLogs(data)
+    } catch (e) {
+      console.error('fetchLogs failed:', e)
+    }
+    try {
+      const prData = await fetchPRs()
       setPrs(prData)
     } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
+      console.error('fetchPRs failed:', e)
     }
+    setLoading(false)
   }, [])
 
   // Initial load + polling
