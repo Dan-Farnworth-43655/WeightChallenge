@@ -1,4 +1,4 @@
-import { dayOfCompetition, COMPETITION_DAYS, formatProjectedFinish, formatDate, todayStr, PARTICIPANTS, COMPETITORS } from '../utils/calculations'
+import { dayOfCompetition, COMPETITION_DAYS, COMPETITION_END, formatProjectedFinish, formatDate, todayStr, PARTICIPANTS, COMPETITORS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
@@ -125,6 +125,107 @@ function StatCard({ stats, rank }) {
   )
 }
 
+function HorseRace({ allStats }) {
+  // Days remaining (inclusive of today)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const end = new Date(COMPETITION_END)
+  end.setHours(0, 0, 0, 0)
+  const daysLeft = Math.max(0, Math.ceil((end - today) / 86400000))
+  const totalDays = COMPETITION_DAYS
+  const dayNum = dayOfCompetition()
+
+  // Determine winner — first competitor to log a weight at or below their goal
+  let winner = null
+  let earliestWinDate = null
+  for (const s of allStats) {
+    if (s.participant.observer || s.goal == null) continue
+    const winLog = s.logs.find(l => l.weight <= s.goal)
+    if (winLog && (!earliestWinDate || winLog.date < earliestWinDate)) {
+      earliestWinDate = winLog.date
+      winner = { participant: s.participant, winDate: winLog.date, winWeight: winLog.weight }
+    }
+  }
+
+  // Urgency color for days countdown
+  const urgencyColor =
+    daysLeft <= 7  ? 'text-red-400'    :
+    daysLeft <= 21 ? 'text-amber-300'  :
+                     'text-emerald-300'
+
+  return (
+    <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold text-sm flex items-center gap-1.5">
+          <span>🏁</span> Race to the Finish
+        </h2>
+        <div className="text-right">
+          <div className={`text-2xl font-black leading-none ${urgencyColor}`}>{daysLeft}</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">
+            {daysLeft === 1 ? 'day left' : 'days left'}
+          </div>
+        </div>
+      </div>
+
+      {/* Winner banner */}
+      {winner && (
+        <div className="mb-3 rounded-xl border border-yellow-400/60 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 px-3 py-2 text-center">
+          <p className="text-xs uppercase tracking-wider text-yellow-300 font-bold">👑 Champion 👑</p>
+          <p className="text-sm font-bold text-white mt-0.5">
+            <span style={{ color: winner.participant.color }}>{winner.participant.name}</span>
+            {' '}won the competition on {formatDate(winner.winDate)}!
+          </p>
+        </div>
+      )}
+
+      {/* Race tracks — one per competitor */}
+      <div className="flex flex-col gap-2">
+        {COMPETITORS.map(p => {
+          const stats = allStats.find(s => s.participant.id === p.id)
+          const pct = Math.max(0, Math.min(1, stats?.pctToGoal ?? 0))
+          const isWinner = winner?.participant.id === p.id
+          // Horse position: % of track width, but reserve right edge for finish line
+          const horseLeft = `calc(${pct * 100}% - 14px)`
+          return (
+            <div key={p.id} className="relative h-9 bg-slate-800/50 rounded-lg overflow-visible">
+              {/* Tinted progress fill */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-l-lg transition-all duration-500"
+                style={{ width: `${pct * 100}%`, backgroundColor: p.color + '22' }}
+              />
+              {/* Lane marker label */}
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 uppercase">
+                {p.initials}
+              </div>
+              {/* Horse (initials in colored circle) */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 transition-all duration-500"
+                style={{ left: horseLeft }}
+              >
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg"
+                  style={{ backgroundColor: p.color, color: '#000' }}
+                >
+                  {isWinner ? '👑' : p.initials}
+                </div>
+              </div>
+              {/* Finish line */}
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 text-base leading-none">🏁</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer: day of competition */}
+      <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between text-xs text-slate-500">
+        <span>Day {dayNum} of {totalDays}</span>
+        <span>Ends {COMPETITION_END.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser, onSeed, seeded }) {
   const day = dayOfCompetition()
   const hasData = logs.length > 0
@@ -186,19 +287,8 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         )
       })}
 
-      {/* Competition progress */}
-      <div>
-        <div className="flex justify-between text-xs text-slate-400 mb-1">
-          <span>Competition progress</span>
-          <span>Day {day} / {COMPETITION_DAYS}</span>
-        </div>
-        <div className="w-full bg-slate-800 rounded-full h-2">
-          <div
-            className="h-2 rounded-full bg-sky-500 transition-all"
-            style={{ width: `${Math.min(100, (day / COMPETITION_DAYS) * 100)}%` }}
-          />
-        </div>
-      </div>
+      {/* Horse race + countdown */}
+      <HorseRace allStats={allStats} />
 
       {/* Seed button (only shown if no data yet) */}
       {!hasData && !seeded && (
