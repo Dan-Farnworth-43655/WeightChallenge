@@ -1,7 +1,81 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import confetti from 'canvas-confetti'
 import { formatDate } from '../utils/calculations'
 import { deleteLog, postLog } from '../api'
+
+const DANCING_GIFS = [
+  'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
+  'https://media.giphy.com/media/26u4lOMA8JKSnL9Uk/giphy.gif',
+  'https://media.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif',
+  'https://media.giphy.com/media/xT9IgG50Lg7rusXIaQ/giphy.gif',
+]
+
+function GoalModal({ participant, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border-2 border-yellow-400/80 rounded-3xl p-6 mx-4 max-w-sm w-full text-center shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-8xl mb-3 animate-bounce">🥇</div>
+        <h2 className="text-3xl font-black tracking-tight mb-1" style={{ color: participant.color }}>
+          GOAL ACHIEVED!
+        </h2>
+        <p className="text-yellow-300 font-bold text-lg mb-2">Congratulations!</p>
+        <p className="text-slate-300 text-sm mb-6">
+          <span className="font-bold" style={{ color: participant.color }}>{participant.name}</span>
+          {' '}hit their goal weight. All that hard work paid off — this is what it feels like to WIN. 🏆
+        </p>
+
+        <div className="grid grid-cols-2 gap-2 mb-6">
+          {DANCING_GIFS.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt="celebration"
+              className="w-full h-28 object-cover rounded-xl"
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-4 rounded-xl font-black text-lg transition-colors active:scale-95"
+          style={{ backgroundColor: participant.color, color: '#000' }}
+        >
+          I AM A CHAMPION 🥇
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function JavinTauntModal({ onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border-2 border-purple-500/60 rounded-3xl p-6 mx-4 max-w-xs w-full text-center shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-6xl mb-3">😤</div>
+        <h2 className="text-2xl font-black text-purple-400 mb-2 tracking-tight">Dan will beat you.</h2>
+        <p className="text-slate-400 text-sm mb-6">Just thought you should know. 💜</p>
+        <button
+          onClick={onClose}
+          className="w-full py-3 rounded-xl font-black text-base bg-purple-600 hover:bg-purple-500 text-white transition-colors active:scale-95"
+        >
+          We'll see about that 😤
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function playOink() {
   try {
@@ -45,6 +119,67 @@ function GainModal({ onClose }) {
   )
 }
 
+const MILESTONE_CONFIG = {
+  10: {
+    header: '🎉🎊🎉',
+    title: '10 LBS DOWN!',
+    subtitle: 'is officially 10 pounds lighter. The boys are celebrating!',
+    button: "LET'S GOOO! 🔥",
+  },
+  15: {
+    header: '🔥💪🔥',
+    title: '15 LBS DOWN!',
+    subtitle: 'just dropped 15 pounds. That\'s a whole Thanksgiving turkey!',
+    button: "KEEP GRINDING! 💪",
+  },
+  20: {
+    header: '👑🏆👑',
+    title: '20 LBS DOWN!',
+    subtitle: 'lost 20 POUNDS. That is absolutely unreal. Legend status.',
+    button: "ABSOLUTE UNIT! 🏆",
+  },
+}
+
+function MilestoneModal({ participant, lbs, onClose }) {
+  const cfg = MILESTONE_CONFIG[lbs] ?? MILESTONE_CONFIG[10]
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border-2 border-amber-400/60 rounded-3xl p-6 mx-4 max-w-sm w-full text-center shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-5xl mb-2">{cfg.header}</div>
+        <h2 className="text-3xl font-black text-amber-400 mb-1 tracking-tight">{cfg.title}</h2>
+        <p className="text-slate-300 text-sm mb-5">
+          <span className="font-bold" style={{ color: participant.color }}>{participant.name}</span>
+          {' '}{cfg.subtitle} 💪
+        </p>
+
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {DANCING_GIFS.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt="dancing celebration"
+              className="w-full h-28 object-cover rounded-xl"
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 rounded-xl font-black text-base bg-amber-400 hover:bg-amber-300 text-black transition-colors active:scale-95"
+        >
+          {cfg.button}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function LogWeight({ participant, stats, onLog, onRefresh, todayStr }) {
   const [weight, setWeight] = useState('')
   const [date, setDate] = useState(todayStr)
@@ -53,7 +188,7 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
   const [editingDate, setEditingDate] = useState(null)
   const [editWeight, setEditWeight] = useState('')
   const [deletingDate, setDeletingDate] = useState(null)
-  const [showGain, setShowGain] = useState(false)
+  const [modalQueue, setModalQueue] = useState([]) // ordered list of modals to show
 
   const todayEntry = stats?.logs?.find(l => l.date === date)
 
@@ -62,10 +197,17 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
     if (!weight || isNaN(parseFloat(weight))) return
 
     const w = parseFloat(weight)
+    const effectiveStart = stats?.effectiveStart
+    const priorLost = stats?.lost ?? 0
+    const newLost = effectiveStart != null ? effectiveStart - w : 0
+    const MILESTONES = [20, 15, 10]
+    const hitMilestone = MILESTONES.find(m => newLost >= m && priorLost < m) ?? null
+    const hitGoal = stats?.goal != null && stats?.current != null
+      && w <= stats.goal && stats.current > stats.goal
     const gainedWeight = stats?.current != null && stats.logs.length > 0 && w > stats.current
 
     // Play oink synchronously BEFORE the await — any async gap kills iOS gesture context
-    if (gainedWeight) playOink()
+    if (gainedWeight && !hitMilestone && !hitGoal) playOink()
 
     setSaving(true)
     const result = await onLog(participant.id, date, w)
@@ -73,13 +215,35 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
     setSaved(true)
     setWeight('')
 
-    // Subtle confetti for new personal records — not a popup, just an effect
     if (result?.isPR) {
       confetti({ particleCount: 80, angle: 60,  spread: 55, origin: { x: 0, y: 0.7 }, colors: [participant.color, '#fbbf24', '#ffffff'] })
       confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors: [participant.color, '#fbbf24', '#ffffff'] })
     }
 
-    if (gainedWeight) setShowGain(true)
+    // Build the modal queue in priority order
+    const queue = []
+
+    if (hitGoal) {
+      const gold = ['#fbbf24', '#f59e0b', '#fcd34d', '#ffffff', participant.color]
+      confetti({ particleCount: 200, angle: 60,  spread: 80,  origin: { x: 0,   y: 0.5 }, colors: gold })
+      confetti({ particleCount: 200, angle: 120, spread: 80,  origin: { x: 1,   y: 0.5 }, colors: gold })
+      confetti({ particleCount: 150, angle: 90,  spread: 100, origin: { x: 0.5, y: 0   }, colors: gold })
+      queue.push('goal')
+    }
+
+    if (hitMilestone && !hitGoal) {
+      const colors = [participant.color, '#fbbf24', '#f472b6', '#34d399', '#ffffff']
+      const count = hitMilestone === 20 ? 180 : hitMilestone === 15 ? 150 : 120
+      confetti({ particleCount: count, angle: 60,  spread: 70, origin: { x: 0,   y: 0.6 }, colors })
+      confetti({ particleCount: count, angle: 120, spread: 70, origin: { x: 1,   y: 0.6 }, colors })
+      confetti({ particleCount: 80,   angle: 90,  spread: 90, origin: { x: 0.5, y: 0.3 }, colors })
+      queue.push(`milestone-${hitMilestone}`)
+    }
+
+    if (gainedWeight && !hitMilestone && !hitGoal) queue.push('gain')
+    if (participant.id === 'javin') queue.push('javin')
+
+    if (queue.length > 0) setModalQueue(queue)
 
     setTimeout(() => setSaved(false), 2500)
   }
@@ -99,11 +263,19 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
     setDeletingDate(null)
   }
 
+  const dismissModal = () => setModalQueue(q => q.slice(1))
+
   const sortedLogs = [...(stats?.logs ?? [])].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
-      {showGain && <GainModal onClose={() => setShowGain(false)} />}
+      {/* Modal queue — always shows only the first item; dismiss advances to the next */}
+      {modalQueue[0] === 'goal'      && <GoalModal      participant={participant} onClose={dismissModal} />}
+      {modalQueue[0] === 'gain'      && <GainModal      onClose={dismissModal} />}
+      {modalQueue[0]?.startsWith('milestone') && (
+        <MilestoneModal participant={participant} lbs={parseInt(modalQueue[0].split('-')[1])} onClose={dismissModal} />
+      )}
+      {modalQueue[0] === 'javin'     && <JavinTauntModal onClose={dismissModal} />}
 
       {/* Log form */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
