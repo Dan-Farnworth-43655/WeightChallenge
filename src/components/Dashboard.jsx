@@ -233,7 +233,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                     className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] shadow-lg border-2 border-white/80"
                     style={{ backgroundColor: p.color }}
                   >
-                    {hasWon ? '👑' : '🐎'}
+                    {hasWon ? '👑' : <span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🐎</span>}
                   </div>
                 </div>
               )
