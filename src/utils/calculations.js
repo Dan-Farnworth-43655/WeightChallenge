@@ -53,14 +53,22 @@ export function computeStats(participant, logs) {
   const remaining = goal != null ? current - goal : null
   const pctToGoal = goal != null && effectiveStart != null ? lost / (effectiveStart - goal) : 0
 
-  // Loss streak: walk back from most recent log, count consecutive entries
-  // where weight strictly decreased vs the previous logged day.
-  // (Gaps in days are fine — what matters is the trajectory between logs.)
-  let streak = 0
-  for (let i = myLogs.length - 1; i > 0; i--) {
-    if (myLogs[i].weight < myLogs[i - 1].weight) streak++
-    else break
+  // Loss streak: walk forward through all logs, recording every completed streak
+  // and tracking the current (active) one. A "streak" = consecutive entries where
+  // each weight is LESS THAN OR EQUAL TO the previous (i.e., no gains).
+  // Only an actual weight gain breaks the streak; flat days count.
+  let streak = 0          // current ongoing streak
+  let prevBestStreak = 0  // longest PRIOR completed streak (not counting the active one)
+  let run = 0
+  for (let i = 1; i < myLogs.length; i++) {
+    if (myLogs[i].weight <= myLogs[i - 1].weight) {
+      run++
+    } else {
+      if (run > prevBestStreak) prevBestStreak = run
+      run = 0
+    }
   }
+  streak = run // whatever's still going at the end is the active streak
 
   // Pace: linear regression over rolling 21-day window, requires 7+ weigh-ins
   const ROLLING_DAYS = 21
@@ -131,6 +139,7 @@ export function computeStats(participant, logs) {
     projectedEndWeight,
     regressionData,
     streak,
+    prevBestStreak,
     logs: myLogs,
   }
 }
