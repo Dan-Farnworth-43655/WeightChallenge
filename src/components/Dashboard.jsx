@@ -134,13 +134,14 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   // Build merged achievement banner list:
   //   - weight PR today, OR
-  //   - active streak that's a new STREAK personal record (>= 2 AND > previous best)
+  //   - active loss streak of 2+ days
+  // If a person has BOTH, they get one combined banner.
   const banners = []
   for (const s of allStats) {
     const pr = prByParticipant[s.participant.id]
-    const isStreakPR = s.streak >= 2 && s.streak > s.prevBestStreak
-    if (pr || isStreakPR) {
-      banners.push({ participant: s.participant, pr, streak: isStreakPR ? s.streak : 0 })
+    const hasStreak = s.streak >= 2
+    if (pr || hasStreak) {
+      banners.push({ participant: s.participant, pr, streak: hasStreak ? s.streak : 0 })
     }
   }
 
