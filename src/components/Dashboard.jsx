@@ -1,10 +1,79 @@
-import { dayOfCompetition, COMPETITION_DAYS, formatProjectedFinish, formatDate, todayStr, PARTICIPANTS, COMPETITORS } from '../utils/calculations'
+import { dayOfCompetition, COMPETITION_DAYS, COMPETITION_END, formatProjectedFinish, formatDate, todayStr, PARTICIPANTS, COMPETITORS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
 import RegressionChart from './RegressionChart'
 
 const MEDALS = ['🥇', '🥈', '🥉']
+
+function FinalStretch({ allStats }) {
+  // Days remaining (inclusive of today)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const end = new Date(COMPETITION_END)
+  end.setHours(0, 0, 0, 0)
+  const daysLeft = Math.max(0, Math.ceil((end - today) / 86400000))
+  if (daysLeft <= 0) return null
+
+  // Competitor rows: lbs remaining + daily pace needed
+  const rows = COMPETITORS.map(p => {
+    const s = allStats.find(st => st.participant.id === p.id)
+    const remaining = s?.remaining ?? null  // current - goal
+    const done = remaining != null && remaining <= 0
+    const paceNeeded = done ? 0 : remaining / daysLeft
+    return { p, remaining, done, paceNeeded }
+  })
+
+  return (
+    <div className="rounded-2xl border-2 border-red-500/50 bg-gradient-to-br from-red-950/60 via-orange-950/40 to-amber-950/40 p-4 shadow-lg">
+      <div className="text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-300 mb-1">🔥 Final Stretch 🔥</p>
+        <p className="text-5xl font-black leading-none text-white tabular-nums">
+          {daysLeft}
+        </p>
+        <p className="text-xs uppercase tracking-wider text-red-300 mt-1">
+          {daysLeft === 1 ? 'day left' : 'days left'}
+        </p>
+      </div>
+
+      <div className="my-3 h-px bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
+
+      <div className="flex flex-col gap-2">
+        {rows.map(({ p, remaining, done, paceNeeded }) => (
+          <div key={p.id} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border border-white/20"
+                style={{ backgroundColor: p.color, color: '#000' }}
+              >
+                {p.initials}
+              </span>
+              <span className="font-semibold text-white">{p.name}</span>
+            </div>
+            {done ? (
+              <span className="font-black text-emerald-400 text-sm">✓ AT GOAL</span>
+            ) : remaining == null ? (
+              <span className="text-slate-500 text-xs">—</span>
+            ) : (
+              <div className="text-right">
+                <div className="font-bold text-white tabular-nums">
+                  {remaining.toFixed(1)} lbs to go
+                </div>
+                <div className="text-[11px] text-amber-300 tabular-nums">
+                  {paceNeeded.toFixed(2)} lbs/day needed
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-center text-xs italic text-red-200/80">
+        Iron sharpens iron. Finish strong. ⚔️
+      </p>
+    </div>
+  )
+}
 
 function Verse({ reference, text }) {
   return (
@@ -147,6 +216,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
+      {/* Final stretch tracker — days left + pounds remaining + pace needed */}
+      {hasData && <FinalStretch allStats={allStats} />}
+
       {/* Achievement banners — PRs and active loss streaks */}
       {banners.map(({ participant: p, pr, streak }) => {
         const both = pr && streak
