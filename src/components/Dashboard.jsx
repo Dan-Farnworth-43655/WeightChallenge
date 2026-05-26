@@ -203,12 +203,14 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   // Build merged achievement banner list:
   //   - weight PR today, OR
-  //   - active loss streak of 2+ days
+  //   - active loss streak of 2+ days AND they logged today
+  //     (a streak only counts as "active" if they're still logging — no stale streaks)
   // If a person has BOTH, they get one combined banner.
   const banners = []
   for (const s of allStats) {
     const pr = prByParticipant[s.participant.id]
-    const hasStreak = s.streak >= 2
+    const loggedToday = s.logs.some(l => l.date === todayStr())
+    const hasStreak = s.streak >= 2 && loggedToday
     if (pr || hasStreak) {
       banners.push({ participant: s.participant, pr, streak: hasStreak ? s.streak : 0 })
     }
