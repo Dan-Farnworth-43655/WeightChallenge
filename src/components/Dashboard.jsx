@@ -25,15 +25,31 @@ function ProgressBar({ pct, color }) {
   )
 }
 
-function MilestoneList({ milestones, color, currentWeight }) {
-  if (!milestones?.length) return null
-  // Find index of next un-hit milestone
-  const nextIdx = milestones.findIndex(m => !m.hit)
+function MilestoneList({ milestones, color, goal, goalDate, goalHit, goalRemaining, daysToGoalDate }) {
+  // Build combined list = milestones + goal as final entry
+  const items = [...(milestones ?? [])]
+  if (goal != null) {
+    items.push({
+      weight: goal,
+      date: goalDate,
+      dateStr: goalDate ? goalDate.toISOString().split('T')[0] : null,
+      hit: goalHit,
+      hitDate: null,
+      daysToTarget: daysToGoalDate,
+      remaining: goalRemaining,
+      isGoal: true,
+    })
+  }
+  if (!items.length) return null
+
+  // Find index of next un-hit item
+  const nextIdx = items.findIndex(m => !m.hit)
+
   return (
     <div className="mt-3">
       <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Milestones</p>
       <div className="flex flex-col gap-1.5">
-        {milestones.map((m, i) => {
+        {items.map((m, i) => {
           const isNext = i === nextIdx
           return (
             <div
@@ -41,24 +57,36 @@ function MilestoneList({ milestones, color, currentWeight }) {
               className={`flex items-center justify-between text-xs rounded-lg px-2 py-1.5 ${
                 m.hit
                   ? 'bg-emerald-500/10 border border-emerald-500/30'
-                  : isNext
-                    ? 'bg-slate-800 border border-slate-600'
-                    : 'bg-slate-800/50 border border-slate-800'
+                  : m.isGoal
+                    ? `bg-amber-500/10 border ${isNext ? 'border-amber-400/70' : 'border-amber-500/30'}`
+                    : isNext
+                      ? 'bg-slate-800 border border-slate-600'
+                      : 'bg-slate-800/50 border border-slate-800'
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className={`text-base leading-none ${m.hit ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {m.hit ? '✓' : '○'}
+                <span className={`text-base leading-none ${
+                  m.hit ? 'text-emerald-400' : m.isGoal ? 'text-amber-400' : 'text-slate-500'
+                }`}>
+                  {m.hit ? '✓' : m.isGoal ? '🎯' : '○'}
                 </span>
-                <span className={`font-bold tabular-nums ${m.hit ? 'text-emerald-300 line-through opacity-75' : 'text-white'}`}>
+                <span className={`font-bold tabular-nums ${
+                  m.hit ? 'text-emerald-300 line-through opacity-75'
+                       : m.isGoal ? 'text-amber-200' : 'text-white'
+                }`}>
                   {m.weight} lbs
                 </span>
                 {m.date && (
-                  <span className="text-slate-500">
+                  <span className={m.isGoal ? 'text-amber-400/80' : 'text-slate-500'}>
                     by {formatDate(m.dateStr)}
                   </span>
                 )}
-                {isNext && (
+                {m.isGoal && !m.hit && (
+                  <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded text-amber-300 bg-amber-500/20">
+                    Final Goal
+                  </span>
+                )}
+                {!m.isGoal && isNext && (
                   <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ color, backgroundColor: color + '22' }}>
                     Next
                   </span>
@@ -68,7 +96,7 @@ function MilestoneList({ milestones, color, currentWeight }) {
                 <span className="text-[10px] text-emerald-400/80">hit {formatDate(m.hitDate)}</span>
               )}
               {!m.hit && isNext && m.remaining != null && (
-                <span className="text-[10px] text-slate-400 tabular-nums">
+                <span className={`text-[10px] tabular-nums ${m.isGoal ? 'text-amber-300' : 'text-slate-400'}`}>
                   {m.remaining.toFixed(1)} to go{m.daysToTarget != null ? ` · ${m.daysToTarget}d` : ''}
                 </span>
               )}
@@ -186,8 +214,16 @@ function StatCard({ stats }) {
         </div>
       </div>
 
-      {/* Milestones */}
-      <MilestoneList milestones={milestones} color={p.color} currentWeight={current} />
+      {/* Milestones + final goal */}
+      <MilestoneList
+        milestones={milestones}
+        color={p.color}
+        goal={goal}
+        goalDate={goalDate}
+        goalHit={goalHit}
+        goalRemaining={remaining}
+        daysToGoalDate={daysToGoalDate}
+      />
     </div>
   )
 }
@@ -353,6 +389,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                     goal={stats.goal}
                     startWeight={stats.effectiveStart}
                     goalDate={stats.goalDate}
+                    milestones={stats.milestones}
                   />
                 </div>
               )}
