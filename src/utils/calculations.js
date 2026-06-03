@@ -5,7 +5,10 @@ export const PARTICIPANTS = [
   {
     id: 'javin', name: 'Javin', initials: 'JT', color: '#0ea5e9',
     goal: { weight: 190, date: '2026-08-31' },
-    milestones: [],
+    milestones: [
+      { weight: 197, date: '2026-07-15' },
+      { weight: 194, date: '2026-08-15' },
+    ],
   },
   {
     id: 'dan', name: 'Dan', initials: 'DF', color: '#a78bfa',
