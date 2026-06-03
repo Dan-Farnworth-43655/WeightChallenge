@@ -2,7 +2,7 @@ import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer
 } from 'recharts'
-import { formatDate, COMPETITION_END, COMPETITION_START } from '../utils/calculations'
+import { formatDate } from '../utils/calculations'
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
@@ -39,24 +39,24 @@ const CustomTooltip = ({ active, payload }) => {
   )
 }
 
-export default function RegressionChart({ regressionData, color, goal, startWeight, observer }) {
+export default function RegressionChart({ regressionData, color, goal, startWeight, goalDate }) {
   if (!regressionData) return null
 
   const { slope, intercept, originMs, windowLogs, allLogs } = regressionData
   const sourceLogs = allLogs ?? windowLogs
 
-  // Chart bounds
-  let chartOriginMs, totalDays
-  if (observer) {
-    const firstLogMs = new Date(sourceLogs[0].date).getTime()
+  // Chart bounds: first log → goalDate (or +3 months out if no goalDate)
+  const firstLogMs = new Date(sourceLogs[0].date).getTime()
+  let endMs
+  if (goalDate) {
+    endMs = new Date(goalDate).getTime()
+  } else {
     const threeMonthsOut = new Date()
     threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3)
-    chartOriginMs = firstLogMs
-    totalDays = (threeMonthsOut.getTime() - firstLogMs) / 86400000
-  } else {
-    chartOriginMs = COMPETITION_START.getTime()
-    totalDays = (COMPETITION_END.getTime() - chartOriginMs) / 86400000
+    endMs = threeMonthsOut.getTime()
   }
+  const chartOriginMs = firstLogMs
+  const totalDays = Math.max(1, (endMs - chartOriginMs) / 86400000)
 
   const regOffsetDays = (originMs - chartOriginMs) / 86400000
   const windowDateSet = new Set(windowLogs.map(l => l.date))

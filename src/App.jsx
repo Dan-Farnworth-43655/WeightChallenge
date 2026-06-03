@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchLogs, postLog, fetchPRs } from './api'
-import { PARTICIPANTS, computeStats, rankParticipants, todayStr } from './utils/calculations'
+import { PARTICIPANTS, computeStats, sortByGoalProgress, todayStr } from './utils/calculations'
 import { seedInitialData } from './utils/seed'
 import NameSelector from './components/NameSelector'
 import Dashboard from './components/Dashboard'
@@ -65,7 +65,7 @@ export default function App() {
   }
 
   const allStats = PARTICIPANTS.map(p => computeStats(p, logs))
-  const ranked = rankParticipants(allStats)
+  const ranked = sortByGoalProgress(allStats)
   const activeParticipant = PARTICIPANTS.find(p => p.id === activeUser)
 
   if (!activeUser) {
@@ -77,8 +77,8 @@ export default function App() {
       <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold leading-tight">Weight Loss Challenge</h1>
-            <p className="text-xs text-slate-400">Apr 1 – Jun 1, 2026</p>
+            <h1 className="text-lg font-bold leading-tight">Accountability Tracker</h1>
+            <p className="text-xs text-slate-400">One day at a time</p>
           </div>
           <button
             onClick={() => setActiveUser(null)}
@@ -103,7 +103,7 @@ export default function App() {
         {loading ? (
           <div className="flex items-center justify-center h-64 text-slate-400">Loading…</div>
         ) : tab === 'dashboard' ? (
-          <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} onSeed={handleSeed} seeded={seeded} />
+          <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} />
         ) : (
           <LogWeight
             participant={activeParticipant}

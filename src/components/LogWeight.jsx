@@ -119,29 +119,7 @@ function GainModal({ onClose }) {
   )
 }
 
-const MILESTONE_CONFIG = {
-  10: {
-    header: '🎉🎊🎉',
-    title: '10 LBS DOWN!',
-    subtitle: 'is officially 10 pounds lighter. The boys are celebrating!',
-    button: "LET'S GOOO! 🔥",
-  },
-  15: {
-    header: '🔥💪🔥',
-    title: '15 LBS DOWN!',
-    subtitle: 'just dropped 15 pounds. That\'s a whole Thanksgiving turkey!',
-    button: "KEEP GRINDING! 💪",
-  },
-  20: {
-    header: '👑🏆👑',
-    title: '20 LBS DOWN!',
-    subtitle: 'lost 20 POUNDS. That is absolutely unreal. Legend status.',
-    button: "ABSOLUTE UNIT! 🏆",
-  },
-}
-
-function MilestoneModal({ participant, lbs, onClose }) {
-  const cfg = MILESTONE_CONFIG[lbs] ?? MILESTONE_CONFIG[10]
+function MilestoneModal({ participant, milestoneWeight, onClose }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm"
@@ -151,11 +129,14 @@ function MilestoneModal({ participant, lbs, onClose }) {
         className="bg-slate-900 border-2 border-amber-400/60 rounded-3xl p-6 mx-4 max-w-sm w-full text-center shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        <div className="text-5xl mb-2">{cfg.header}</div>
-        <h2 className="text-3xl font-black text-amber-400 mb-1 tracking-tight">{cfg.title}</h2>
+        <div className="text-5xl mb-2">🎉🎊🎉</div>
+        <h2 className="text-3xl font-black text-amber-400 mb-1 tracking-tight">
+          MILESTONE HIT!
+        </h2>
+        <p className="text-amber-300 font-bold text-xl mb-1 tabular-nums">{milestoneWeight} lbs ✓</p>
         <p className="text-slate-300 text-sm mb-5">
           <span className="font-bold" style={{ color: participant.color }}>{participant.name}</span>
-          {' '}{cfg.subtitle} 💪
+          {' '}crushed their milestone. Onto the next one! 💪
         </p>
 
         <div className="grid grid-cols-2 gap-2 mb-5">
@@ -173,7 +154,7 @@ function MilestoneModal({ participant, lbs, onClose }) {
           onClick={onClose}
           className="w-full py-3 rounded-xl font-black text-base bg-amber-400 hover:bg-amber-300 text-black transition-colors active:scale-95"
         >
-          {cfg.button}
+          KEEP GRINDING! 🔥
         </button>
       </div>
     </div>
@@ -197,11 +178,18 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
     if (!weight || isNaN(parseFloat(weight))) return
 
     const w = parseFloat(weight)
-    const effectiveStart = stats?.effectiveStart
-    const priorLost = stats?.lost ?? 0
-    const newLost = effectiveStart != null ? effectiveStart - w : 0
-    const MILESTONES = [20, 15, 10]
-    const hitMilestone = MILESTONES.find(m => newLost >= m && priorLost < m) ?? null
+    // Find any user-defined milestone weight this log newly crosses.
+    // "Newly crossed" = no prior log was <= milestone weight, and now w <= milestone weight.
+    // If multiple are crossed at once, pick the lowest weight (most ambitious).
+    const milestones = participant.milestones ?? []
+    let hitMilestone = null
+    for (const m of milestones) {
+      const wasHit = stats?.logs?.some(l => l.weight <= m.weight)
+      if (wasHit) continue
+      if (w <= m.weight) {
+        if (!hitMilestone || m.weight < hitMilestone.weight) hitMilestone = m
+      }
+    }
     const hitGoal = stats?.goal != null && stats?.current != null
       && w <= stats.goal && stats.current > stats.goal
     const gainedWeight = stats?.current != null && stats.logs.length > 0 && w > stats.current
@@ -233,11 +221,10 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
 
     if (hitMilestone && !hitGoal) {
       const colors = [participant.color, '#fbbf24', '#f472b6', '#34d399', '#ffffff']
-      const count = hitMilestone === 20 ? 180 : hitMilestone === 15 ? 150 : 120
-      confetti({ particleCount: count, angle: 60,  spread: 70, origin: { x: 0,   y: 0.6 }, colors })
-      confetti({ particleCount: count, angle: 120, spread: 70, origin: { x: 1,   y: 0.6 }, colors })
-      confetti({ particleCount: 80,   angle: 90,  spread: 90, origin: { x: 0.5, y: 0.3 }, colors })
-      queue.push(`milestone-${hitMilestone}`)
+      confetti({ particleCount: 150, angle: 60,  spread: 70, origin: { x: 0,   y: 0.6 }, colors })
+      confetti({ particleCount: 150, angle: 120, spread: 70, origin: { x: 1,   y: 0.6 }, colors })
+      confetti({ particleCount: 80,  angle: 90,  spread: 90, origin: { x: 0.5, y: 0.3 }, colors })
+      queue.push(`milestone-${hitMilestone.weight}`)
     }
 
     if (gainedWeight && !hitMilestone && !hitGoal) queue.push('gain')
@@ -273,7 +260,11 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
       {modalQueue[0] === 'goal'      && <GoalModal      participant={participant} onClose={dismissModal} />}
       {modalQueue[0] === 'gain'      && <GainModal      onClose={dismissModal} />}
       {modalQueue[0]?.startsWith('milestone') && (
-        <MilestoneModal participant={participant} lbs={parseInt(modalQueue[0].split('-')[1])} onClose={dismissModal} />
+        <MilestoneModal
+          participant={participant}
+          milestoneWeight={parseFloat(modalQueue[0].split('-')[1])}
+          onClose={dismissModal}
+        />
       )}
       {modalQueue[0] === 'paul'      && <PaulTauntModal onClose={dismissModal} />}
 
@@ -297,7 +288,6 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
               value={date}
               onChange={e => { setDate(e.target.value); setSaved(false) }}
               min="2026-04-01"
-              max="2026-06-01"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-sky-500"
             />
           </div>

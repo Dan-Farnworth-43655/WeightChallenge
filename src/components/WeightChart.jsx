@@ -1,7 +1,7 @@
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
-import { formatDate, COMPETITION_START } from '../utils/calculations'
+import { formatDate } from '../utils/calculations'
 
 function buildChartData(logs, participants) {
   // Collect all dates that have at least one log

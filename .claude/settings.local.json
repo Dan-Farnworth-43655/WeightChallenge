@@ -16,7 +16,12 @@
       "Bash(node -e \":*)",
       "Bash(npm create:*)",
       "Bash(cp .env.example .env)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(del .git\\\\index.lock)",
+      "Bash(rm \"C:/Users/dfarnwor/OneDrive - Nelnet, Inc/Claude Projects/Weight_Tracker/.git/index.lock\")"
     ]
   }
 }

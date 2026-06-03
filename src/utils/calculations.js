@@ -1,28 +1,37 @@
-export const COMPETITION_START = new Date('2026-04-01')
-export const COMPETITION_END = new Date('2026-06-01')
-export const COMPETITION_DAYS = 62
-
+// Participant configuration — each person has their own goal and milestones.
+// Goals: { weight, date }. Milestones: array of { weight, date } (date optional).
+// Milestones should be ordered from highest weight to lowest (i.e. earliest to latest in the journey).
 export const PARTICIPANTS = [
-  { id: 'javin', name: 'Javin', initials: 'JT', startWeight: 214.2, goalPercent: 0.08, color: '#0ea5e9' },
-  { id: 'dan',   name: 'Dan',   initials: 'DF', startWeight: 198.3, goalPercent: 0.08, color: '#a78bfa' },
-  { id: 'paul',  name: 'Paul',  initials: 'PW', startWeight: 233.4, goalPercent: 0.08, color: '#34d399' },
-  { id: 'josh',  name: 'Josh',  initials: 'JR', startWeight: null,  goalWeight: 185,  color: '#f59e0b', observer: true },
+  {
+    id: 'javin', name: 'Javin', initials: 'JT', color: '#0ea5e9',
+    goal: { weight: 190, date: '2026-08-31' },
+    milestones: [],
+  },
+  {
+    id: 'dan', name: 'Dan', initials: 'DF', color: '#a78bfa',
+    goal: { weight: 175, date: '2026-08-31' },
+    milestones: [
+      { weight: 180, date: '2026-07-15' },
+    ],
+  },
+  {
+    id: 'paul', name: 'Paul', initials: 'PW', color: '#34d399',
+    goal: { weight: 185, date: '2026-12-31' },
+    milestones: [
+      { weight: 207, date: '2026-07-31' },
+      { weight: 195, date: '2026-09-30' },
+    ],
+  },
+  {
+    id: 'josh', name: 'Josh', initials: 'JR', color: '#f59e0b',
+    goal: { weight: 185, date: '2026-09-30' },
+    milestones: [
+      { weight: 200, date: '2026-06-30' },
+      { weight: 195, date: '2026-07-31' },
+      { weight: 190, date: '2026-08-31' },
+    ],
+  },
 ]
-
-export const COMPETITORS = PARTICIPANTS.filter(p => !p.observer)
-export const OBSERVERS   = PARTICIPANTS.filter(p => p.observer)
-
-export function goalWeight(p) {
-  return p.startWeight * (1 - p.goalPercent)
-}
-
-export function dayOfCompetition() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const start = new Date(COMPETITION_START)
-  start.setHours(0, 0, 0, 0)
-  return Math.max(1, Math.floor((today - start) / 86400000) + 1)
-}
 
 export function toDateStr(date) {
   return date.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
@@ -30,6 +39,16 @@ export function toDateStr(date) {
 
 export function todayStr() {
   return toDateStr(new Date())
+}
+
+function parseDate(str) {
+  return new Date(str + 'T00:00:00')
+}
+
+function daysBetween(fromDate, toDate) {
+  const a = new Date(fromDate); a.setHours(0, 0, 0, 0)
+  const b = new Date(toDate);   b.setHours(0, 0, 0, 0)
+  return Math.round((b - a) / 86400000)
 }
 
 /**
@@ -42,23 +61,58 @@ export function computeStats(participant, logs) {
     .sort((a, b) => a.date.localeCompare(b.date))
 
   const weighIns = myLogs.length
-  // Observers use first log as baseline; competitors use hardcoded startWeight
-  const effectiveStart = participant.startWeight ?? (weighIns > 0 ? myLogs[0].weight : null)
-  const current = weighIns > 0 ? myLogs[myLogs.length - 1].weight : effectiveStart
-  const goal = participant.goalPercent != null && effectiveStart != null
-    ? goalWeight({ ...participant, startWeight: effectiveStart })
-    : participant.goalWeight ?? null
+  const effectiveStart = weighIns > 0 ? myLogs[0].weight : null
+  const current = weighIns > 0 ? myLogs[myLogs.length - 1].weight : null
+
+  // Goal
+  const goal     = participant.goal?.weight ?? null
+  const goalDate = participant.goal?.date ? parseDate(participant.goal.date) : null
+
   const lost = effectiveStart != null && current != null ? effectiveStart - current : 0
   const pctLost = effectiveStart ? lost / effectiveStart : 0
-  const remaining = goal != null ? current - goal : null
-  const pctToGoal = goal != null && effectiveStart != null ? lost / (effectiveStart - goal) : 0
+  const remaining = goal != null && current != null ? current - goal : null
+  const pctToGoal = goal != null && effectiveStart != null
+    ? Math.max(0, Math.min(1, lost / (effectiveStart - goal)))
+    : 0
 
-  // Loss streak: walk forward through all logs, recording every completed streak
-  // and tracking the current (active) one. A "streak" = consecutive entries where
-  // each weight is LESS THAN OR EQUAL TO the previous (i.e., no gains).
-  // Only an actual weight gain breaks the streak; flat days count.
-  let streak = 0          // current ongoing streak
-  let prevBestStreak = 0  // longest PRIOR completed streak (not counting the active one)
+  // Days to goal date + pace needed
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const daysToGoalDate = goalDate ? Math.max(0, daysBetween(today, goalDate)) : null
+  const paceNeeded = (remaining != null && remaining > 0 && daysToGoalDate != null && daysToGoalDate > 0)
+    ? remaining / daysToGoalDate
+    : 0
+
+  // Milestone progress — for each milestone, has it been hit? Earliest log date that
+  // first dropped to or below the milestone weight wins.
+  const milestones = (participant.milestones ?? []).map(m => {
+    const hitLog = myLogs.find(l => l.weight <= m.weight)
+    const hit = !!hitLog
+    const targetDate = m.date ? parseDate(m.date) : null
+    const daysToTarget = targetDate ? Math.max(0, daysBetween(today, targetDate)) : null
+    const remainingToMilestone = current != null ? Math.max(0, current - m.weight) : null
+    const paceNeededToMilestone = (remainingToMilestone != null && remainingToMilestone > 0 && daysToTarget != null && daysToTarget > 0)
+      ? remainingToMilestone / daysToTarget
+      : 0
+    return {
+      weight: m.weight,
+      date: targetDate,
+      dateStr: m.date ?? null,
+      hit,
+      hitDate: hitLog?.date ?? null,
+      daysToTarget,
+      remaining: remainingToMilestone,
+      paceNeeded: paceNeededToMilestone,
+    }
+  })
+
+  // Next active milestone = first one not yet hit
+  const nextMilestone = milestones.find(m => !m.hit) ?? null
+  // Goal achieved?
+  const goalHit = goal != null && current != null && current <= goal
+
+  // Loss streak (consecutive entries where weight <= previous; only gains break it)
+  let streak = 0
+  let prevBestStreak = 0
   let run = 0
   for (let i = 1; i < myLogs.length; i++) {
     if (myLogs[i].weight <= myLogs[i - 1].weight) {
@@ -68,24 +122,24 @@ export function computeStats(participant, logs) {
       run = 0
     }
   }
-  streak = run // whatever's still going at the end is the active streak
+  streak = run
 
-  // Pace: linear regression over rolling 21-day window, requires 7+ weigh-ins
-  const ROLLING_DAYS = 21
-  const MIN_WEIGH_INS = 7
-  let pace = null        // simple average: displayed in UI
-  let regressionPace = null  // regression slope: used for forecasting
-  let projectedFinish = null
-  let projectedEndWeight = null
-  let regressionData = null
-
-  // Simple average pace for display
+  // Pace (simple average across all logs, for display)
+  let pace = null
   if (weighIns >= 2) {
     const firstDate = new Date(myLogs[0].date)
-    const lastDate = new Date(myLogs[myLogs.length - 1].date)
+    const lastDate  = new Date(myLogs[myLogs.length - 1].date)
     const daysElapsed = Math.max(1, (lastDate - firstDate) / 86400000)
     pace = lost / daysElapsed
   }
+
+  // 21-day rolling least-squares regression for projections (requires 7+ weigh-ins)
+  const ROLLING_DAYS = 21
+  const MIN_WEIGH_INS = 7
+  let regressionPace = null
+  let projectedFinish = null      // Projected DATE of hitting goal
+  let projectedGoalDateWeight = null  // Projected weight on goal date
+  let regressionData = null
 
   if (weighIns >= MIN_WEIGH_INS) {
     const windowLast = new Date(myLogs[myLogs.length - 1].date)
@@ -93,7 +147,6 @@ export function computeStats(participant, logs) {
     cutoff.setDate(cutoff.getDate() - ROLLING_DAYS)
     const windowLogs = myLogs.filter(l => new Date(l.date) >= cutoff)
 
-    // Least-squares linear regression: x = days elapsed, y = weight
     const origin = new Date(windowLogs[0].date).getTime()
     const pts = windowLogs.map(l => ({
       x: (new Date(l.date).getTime() - origin) / 86400000,
@@ -108,9 +161,11 @@ export function computeStats(participant, logs) {
     const intercept = (sumY - slope * sumX) / n
     regressionPace = -slope
 
-    // Projected weight at end of competition (June 1) — works for gain or loss
-    const daysToEnd = Math.max(0, (COMPETITION_END - windowLast) / 86400000)
-    projectedEndWeight = parseFloat((current - regressionPace * daysToEnd).toFixed(1))
+    // Projected weight on the user's goal date
+    if (goalDate) {
+      const daysToGoalEnd = Math.max(0, (goalDate - windowLast) / 86400000)
+      projectedGoalDateWeight = parseFloat((current - regressionPace * daysToGoalEnd).toFixed(1))
+    }
 
     // Projected date of hitting goal (only meaningful if actively losing)
     if (regressionPace > 0 && remaining > 0) {
@@ -118,10 +173,8 @@ export function computeStats(participant, logs) {
       projectedFinish = new Date(windowLast.getTime() + daysLeft * 86400000)
     }
 
-    // Pass regression details for chart
     const originMs = new Date(windowLogs[0].date).getTime()
-    const endDayX = (COMPETITION_END.getTime() - originMs) / 86400000
-    regressionData = { pts, slope, intercept, originMs, endDayX, windowLogs, allLogs: myLogs }
+    regressionData = { pts, slope, intercept, originMs, windowLogs, allLogs: myLogs }
   }
 
   return {
@@ -130,13 +183,19 @@ export function computeStats(participant, logs) {
     current,
     effectiveStart,
     goal,
+    goalDate,
+    goalHit,
     lost,
     pctLost,
     remaining,
     pctToGoal,
+    daysToGoalDate,
+    paceNeeded,
+    milestones,
+    nextMilestone,
     pace,
     projectedFinish,
-    projectedEndWeight,
+    projectedGoalDateWeight,
     regressionData,
     streak,
     prevBestStreak,
@@ -146,8 +205,13 @@ export function computeStats(participant, logs) {
 
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00')
+  const d = typeof dateStr === 'string' ? new Date(dateStr + 'T00:00:00') : dateStr
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+export function formatLongDate(date) {
+  if (!date) return '—'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function formatProjectedFinish(date) {
@@ -155,11 +219,8 @@ export function formatProjectedFinish(date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function rankParticipants(allStats) {
-  const competitors = allStats.filter(s => !s.participant.observer)
-  const observers   = allStats.filter(s =>  s.participant.observer)
-  return [
-    ...competitors.sort((a, b) => b.pctLost - a.pctLost),
-    ...observers,
-  ]
+// Sort by % to goal (descending) so people closer to their own goal show up higher.
+// This is not "ranked competition" — just a sensible ordering for the dashboard list.
+export function sortByGoalProgress(allStats) {
+  return [...allStats].sort((a, b) => b.pctToGoal - a.pctToGoal)
 }
