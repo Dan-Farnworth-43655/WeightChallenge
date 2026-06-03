@@ -4,6 +4,7 @@ import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
 import RegressionChart from './RegressionChart'
+import NotificationOptIn from './NotificationOptIn'
 
 function Verse({ reference, text }) {
   return (
@@ -412,6 +413,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         <div className="flex flex-col gap-4">
           <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
           <StatCardWithRegression stats={myStats} />
+          {activeUser && <NotificationOptIn participantId={activeUser} />}
         </div>
       )}
 
