@@ -142,8 +142,8 @@ function StatCard({ stats }) {
             </span>
           )}
           {streak >= 2 && (
-            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title="Days without a weight gain">
-              🔥 {streak}
+            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss streak (weekly average down)`}>
+              🔥 {streak}wk
             </span>
           )}
         </div>
@@ -271,12 +271,13 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const recentPRs = prs.filter(pr => pr.date === today)
   const prByParticipant = Object.fromEntries(recentPRs.map(pr => [pr.participant, pr]))
 
-  // Achievement banners: PR today, or active streak of 2+ with a log today
+  // Achievement banners: PR today, or active weekly streak of 2+ weeks
+  // with a recent log (within the last 7 days — no stale weekly streaks)
   const banners = []
   for (const s of allStats) {
     const pr = prByParticipant[s.participant.id]
-    const loggedToday = s.logs.some(l => l.date === today)
-    const hasStreak = s.streak >= 2 && loggedToday
+    const recentlyActive = s.daysSinceLastLog != null && s.daysSinceLastLog <= 7
+    const hasStreak = s.streak >= 2 && recentlyActive
     if (pr || hasStreak) {
       banners.push({ participant: s.participant, pr, streak: hasStreak ? s.streak : 0 })
     }
@@ -300,7 +301,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
             <span className="text-3xl">{icon}</span>
             <div className="flex-1">
               <p className={`text-sm font-bold ${titleColor}`}>
-                {both ? 'New PR + Hot Streak!' : pr ? 'New Personal Record!' : `${streak}-Day Loss Streak! 🔥`}
+                {both ? 'New PR + Hot Streak!' : pr ? 'New Personal Record!' : `${streak}-Week Loss Streak! 🔥`}
               </p>
               <p className="text-xs text-slate-300 mt-0.5">
                 <span className="font-semibold" style={{ color: p.color }}>{p.name}</span>
@@ -314,13 +315,13 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                 {pr && streak && (
                   <>
                     {' '}·{' '}
-                    <span className="font-bold text-orange-300">{streak} days</span> losing in a row 🔥
+                    <span className="font-bold text-orange-300">{streak} weeks</span> trending down 🔥
                   </>
                 )}
                 {!pr && streak > 0 && (
                   <>
                     {' '}is on a{' '}
-                    <span className="font-bold text-orange-300">{streak}-day</span> loss streak. Don't break the chain! 🔥
+                    <span className="font-bold text-orange-300">{streak}-week</span> downtrend. Don't break the chain! 🔥
                   </>
                 )}
               </p>

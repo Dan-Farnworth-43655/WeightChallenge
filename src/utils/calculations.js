@@ -54,6 +54,15 @@ function daysBetween(fromDate, toDate) {
   return Math.round((b - a) / 86400000)
 }
 
+// Returns YYYY-MM-DD of the Monday of the week containing dateStr.
+function mondayOf(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const diff = day === 0 ? 6 : day - 1
+  d.setDate(d.getDate() - diff)
+  return d.toISOString().split('T')[0]
+}
+
 /**
  * Build per-participant stats from a list of log entries.
  * logs: [{ participant, date (YYYY-MM-DD), weight }]
@@ -151,12 +160,25 @@ export function computeStats(participant, logs) {
     daysSinceLastLog = Math.max(0, Math.round((today - lastDate) / 86400000))
   }
 
-  // Weight-loss streak (consecutive entries where weight <= previous; only gains break it)
+  // Weight-loss streak (WEEKLY): group logs by Mon–Sun calendar week, average each,
+  // then count consecutive weeks where avg <= previous week's avg. Smooths out daily
+  // water/sodium noise so the streak reflects real trend, not scale fluctuations.
+  const weekAccum = {}
+  for (const l of myLogs) {
+    const ws = mondayOf(l.date)
+    if (!weekAccum[ws]) weekAccum[ws] = { sum: 0, count: 0 }
+    weekAccum[ws].sum += l.weight
+    weekAccum[ws].count++
+  }
+  const weeklyAvgs = Object.keys(weekAccum)
+    .sort()
+    .map(ws => ({ weekStart: ws, avg: weekAccum[ws].sum / weekAccum[ws].count }))
+
   let streak = 0
   let prevBestStreak = 0
   let run = 0
-  for (let i = 1; i < myLogs.length; i++) {
-    if (myLogs[i].weight <= myLogs[i - 1].weight) {
+  for (let i = 1; i < weeklyAvgs.length; i++) {
+    if (weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg) {
       run++
     } else {
       if (run > prevBestStreak) prevBestStreak = run
