@@ -344,16 +344,24 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                 <th className="text-left px-3 py-2">Name</th>
                 <th className="text-center px-1 py-2" title="Consecutive days logged">🗓️</th>
                 <th className="text-right px-2 py-2">Cur</th>
-                <th className="text-right px-2 py-2">Goal</th>
-                <th className="text-right px-2 py-2">To Go</th>
-                <th className="text-right px-2 py-2">%</th>
-                <th className="text-right px-3 py-2">By</th>
+                <th className="text-right px-2 py-2">Next</th>
+                <th className="text-right px-2 py-2">% to Goal</th>
+                <th className="text-right px-3 py-2">Final By</th>
               </tr>
             </thead>
             <tbody>
               {ranked.map((s) => {
                 const loggedToday = s.logs.some(l => l.date === today)
                 const missingToday = s.logs.length > 0 && !loggedToday
+
+                // "Next" = next un-hit milestone, or final goal if all milestones hit
+                const nextTarget = s.nextMilestone
+                  ? { weight: s.nextMilestone.weight, isGoal: false }
+                  : (s.goal != null ? { weight: s.goal, isGoal: true } : null)
+                const lbsToNext = nextTarget && s.current != null
+                  ? Math.max(0, s.current - nextTarget.weight)
+                  : null
+
                 return (
                   <tr
                     key={s.participant.id}
@@ -376,9 +384,17 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                       )}
                     </td>
                     <td className="text-right px-2 py-3 text-slate-300 tabular-nums">{s.current?.toFixed(1) ?? '—'}</td>
-                    <td className="text-right px-2 py-3 text-slate-400 tabular-nums">{s.goal?.toFixed(1) ?? '—'}</td>
-                    <td className="text-right px-2 py-3 font-medium tabular-nums">
-                      {s.goalHit ? <span className="text-emerald-400">✓</span> : s.remaining != null ? s.remaining.toFixed(1) : '—'}
+                    <td className="text-right px-2 py-3 tabular-nums">
+                      {s.goalHit ? (
+                        <span className="text-emerald-400 font-bold">✓</span>
+                      ) : lbsToNext != null && nextTarget ? (
+                        <div>
+                          <div className="font-medium">{lbsToNext.toFixed(1)}</div>
+                          <div className={`text-[10px] ${nextTarget.isGoal ? 'text-amber-400/80' : 'text-slate-500'}`}>
+                            → {nextTarget.weight}{nextTarget.isGoal ? ' 🎯' : ''}
+                          </div>
+                        </div>
+                      ) : '—'}
                     </td>
                     <td className="text-right px-2 py-3 font-bold tabular-nums" style={{ color: s.participant.color }}>
                       {Math.round((s.pctToGoal ?? 0) * 100)}%
