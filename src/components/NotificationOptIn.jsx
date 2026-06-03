@@ -75,8 +75,8 @@ export default function NotificationOptIn({ participantId }) {
         </p>
         <p className="text-xs text-slate-500 mt-0.5">
           {status === 'on'
-            ? "We'll nudge you each evening if you haven't logged."
-            : 'A push notification at 8 PM CT if you forget to log.'}
+            ? "We'll nudge you every morning if you haven't logged."
+            : 'A push notification at 8 AM CT if you haven’t weighed in.'}
         </p>
         {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       </div>

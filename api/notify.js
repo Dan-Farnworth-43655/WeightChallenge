@@ -52,8 +52,8 @@ export default async function handler(req, res) {
     try {
       const sub = typeof raw === 'string' ? JSON.parse(raw) : raw
       await webpush.sendNotification(sub, JSON.stringify({
-        title: '⚖️ Have you weighed in?',
-        body:  "Log your weight before midnight to keep your streak alive.",
+        title: '⚖️ Time to weigh in',
+        body:  'Step on the scale and log it before you forget.',
         tag:   'daily-log-reminder',
         url:   '/',
       }))
