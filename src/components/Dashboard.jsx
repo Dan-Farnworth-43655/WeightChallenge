@@ -113,7 +113,7 @@ function StatCard({ stats }) {
   const {
     participant: p, current, goal, goalDate, goalHit, lost, pctLost, remaining, pctToGoal,
     daysToGoalDate, paceNeeded, milestones, pace, projectedFinish, projectedGoalDateWeight,
-    weighIns, streak,
+    weighIns, streak, logStreak, logStreakAtRisk,
   } = stats
   const isGaining = lost < 0
 
@@ -129,8 +129,20 @@ function StatCard({ stats }) {
             {p.initials}
           </span>
           <span className="font-semibold">{p.name}</span>
+          {logStreak >= 2 && (
+            <span
+              className={`text-xs font-bold rounded-full px-2 py-0.5 border ${
+                logStreakAtRisk
+                  ? 'text-amber-300 bg-amber-500/10 border-amber-500/40'
+                  : 'text-sky-300 bg-sky-500/10 border-sky-500/30'
+              }`}
+              title={logStreakAtRisk ? 'Log today to save your streak!' : 'Consecutive days logged'}
+            >
+              🗓️ {logStreak}{logStreakAtRisk ? '!' : ''}
+            </span>
+          )}
           {streak >= 2 && (
-            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5">
+            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title="Days without a weight gain">
               🔥 {streak}
             </span>
           )}
@@ -317,26 +329,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         )
       })}
 
-      {/* "You haven't logged today" call-to-action — top priority if true */}
-      {hasData && myStats && !myLoggedToday && (
-        <div className="rounded-2xl border-2 border-red-500/50 bg-red-500/10 px-4 py-3 flex items-center gap-3">
-          <span className="text-2xl">⚠️</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-red-300">You haven't logged today.</p>
-            <p className="text-xs text-slate-300 mt-0.5">Tap "Log Weight" at the bottom to keep your streak alive.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Your own card — first thing under banners so it's not buried */}
-      {hasData && myStats && (
-        <div className="flex flex-col gap-4">
-          <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
-          <StatCardWithRegression stats={myStats} />
-        </div>
-      )}
-
-      {/* Group progress table — accountability view, not competition */}
+      {/* Group progress table — top of the dashboard, the accountability anchor */}
       {hasData && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-800">
@@ -346,6 +339,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
             <thead>
               <tr className="text-xs text-slate-500 uppercase">
                 <th className="text-left px-3 py-2">Name</th>
+                <th className="text-center px-1 py-2" title="Consecutive days logged">🗓️</th>
                 <th className="text-right px-2 py-2">Cur</th>
                 <th className="text-right px-2 py-2">Goal</th>
                 <th className="text-right px-2 py-2">To Go</th>
@@ -361,10 +355,22 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                   <tr
                     key={s.participant.id}
                     className={`border-t border-slate-800 ${missingToday ? 'outline outline-1 outline-red-500/40 bg-red-500/5' : ''}`}
-                    title={missingToday ? "Hasn't logged today" : undefined}
+                    title={missingToday ? (s.daysSinceLastLog > 1 ? `Hasn't logged in ${s.daysSinceLastLog} days` : "Hasn't logged today") : undefined}
                   >
                     <td className="px-3 py-3">
                       <span className="font-bold" style={{ color: s.participant.color }}>{s.participant.initials}</span>
+                    </td>
+                    <td className="text-center px-1 py-3 tabular-nums">
+                      {s.logStreak >= 2 ? (
+                        <span
+                          className={`text-xs font-bold ${s.logStreakAtRisk ? 'text-amber-300' : 'text-sky-300'}`}
+                          title={s.logStreakAtRisk ? 'Streak at risk — must log today!' : `${s.logStreak}-day logging streak`}
+                        >
+                          {s.logStreak}{s.logStreakAtRisk ? '!' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600 text-xs">—</span>
+                      )}
                     </td>
                     <td className="text-right px-2 py-3 text-slate-300 tabular-nums">{s.current?.toFixed(1) ?? '—'}</td>
                     <td className="text-right px-2 py-3 text-slate-400 tabular-nums">{s.goal?.toFixed(1) ?? '—'}</td>
@@ -382,6 +388,29 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* "You haven't logged today" call-to-action */}
+      {hasData && myStats && !myLoggedToday && (
+        <div className="rounded-2xl border-2 border-red-500/50 bg-red-500/10 px-4 py-3 flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-red-300">
+              {myStats.logStreakAtRisk
+                ? `You haven't logged today — your ${myStats.logStreak}-day streak is on the line!`
+                : "You haven't logged today."}
+            </p>
+            <p className="text-xs text-slate-300 mt-0.5">Tap "Log Weight" at the bottom to keep showing up.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Your own card */}
+      {hasData && myStats && (
+        <div className="flex flex-col gap-4">
+          <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
+          <StatCardWithRegression stats={myStats} />
         </div>
       )}
 

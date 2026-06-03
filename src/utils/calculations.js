@@ -113,7 +113,45 @@ export function computeStats(participant, logs) {
   // Goal achieved?
   const goalHit = goal != null && current != null && current <= goal
 
-  // Loss streak (consecutive entries where weight <= previous; only gains break it)
+  // Logging streak: consecutive calendar days (Central Time) with at least one log,
+  // ending today. If today is missing, count back from the most recent log instead
+  // and flag it as 'at risk' so the UI can show the streak as fading rather than gone.
+  const loggedDateSet = new Set(myLogs.map(l => l.date))
+  let logStreak = 0
+  let logStreakAtRisk = false
+  const todayDateStr = todayStr()
+  if (loggedDateSet.has(todayDateStr)) {
+    // Walk back from today
+    let cursor = new Date(todayDateStr + 'T00:00:00')
+    while (loggedDateSet.has(toDateStr(cursor))) {
+      logStreak++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+  } else if (myLogs.length > 0) {
+    // Today is missing — show the streak that ended at the last log, marked as at-risk
+    const lastDate = myLogs[myLogs.length - 1].date
+    let cursor = new Date(lastDate + 'T00:00:00')
+    while (loggedDateSet.has(toDateStr(cursor))) {
+      logStreak++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+    // Only flag as "at risk" if their last log was yesterday (streak still salvageable today)
+    const yesterday = new Date(todayDateStr + 'T00:00:00')
+    yesterday.setDate(yesterday.getDate() - 1)
+    logStreakAtRisk = lastDate === toDateStr(yesterday) && logStreak >= 2
+    // If last log is older than yesterday, the streak is already broken
+    if (!logStreakAtRisk) logStreak = 0
+  }
+
+  // Days since last log (for "you haven't logged in X days" indicator)
+  let daysSinceLastLog = null
+  if (myLogs.length > 0) {
+    const lastDate = new Date(myLogs[myLogs.length - 1].date + 'T00:00:00')
+    const today = new Date(todayDateStr + 'T00:00:00')
+    daysSinceLastLog = Math.max(0, Math.round((today - lastDate) / 86400000))
+  }
+
+  // Weight-loss streak (consecutive entries where weight <= previous; only gains break it)
   let streak = 0
   let prevBestStreak = 0
   let run = 0
@@ -202,6 +240,9 @@ export function computeStats(participant, logs) {
     regressionData,
     streak,
     prevBestStreak,
+    logStreak,
+    logStreakAtRisk,
+    daysSinceLastLog,
     logs: myLogs,
   }
 }
