@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
@@ -266,7 +265,6 @@ function StatCardWithRegression({ stats }) {
 export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser }) {
   const hasData = logs.length > 0
   const today = todayStr()
-  const [moreChartsOpen, setMoreChartsOpen] = useState(false)
 
   // PRs set today (Central Time) — banner expires at midnight CT
   const recentPRs = prs.filter(pr => pr.date === today)
@@ -291,6 +289,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
+      {/* Notifications opt-in — top of the page so it's the first thing seen */}
+      {activeUser && <NotificationOptIn participantId={activeUser} />}
+
       {/* Achievement banners — PRs and active loss streaks */}
       {banners.map(({ participant: p, pr, streak }) => {
         const both = pr && streak
@@ -413,7 +414,6 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         <div className="flex flex-col gap-4">
           <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
           <StatCardWithRegression stats={myStats} />
-          {activeUser && <NotificationOptIn participantId={activeUser} />}
         </div>
       )}
 
@@ -423,14 +423,6 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           reference="Ecclesiastes 4:9-10"
           text="Two are better than one... if either of them falls down, one can help the other up."
         />
-      )}
-
-      {/* Group weight trend chart — the one most useful group chart */}
-      {hasData && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-          <h2 className="font-semibold text-sm text-slate-300 mb-4">Weight Over Time</h2>
-          <WeightChart logs={logs} participants={PARTICIPANTS} />
-        </div>
       )}
 
       {/* Teammates' individual stat cards (active user excluded — already shown above) */}
@@ -443,29 +435,22 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       )}
 
-      {/* Collapsible additional charts — less critical day-to-day */}
+      {/* Group trend charts — moved to the bottom of the dashboard */}
       {hasData && (
-        <div>
-          <button
-            onClick={() => setMoreChartsOpen(o => !o)}
-            className="w-full flex items-center justify-between text-xs uppercase tracking-wider text-slate-500 hover:text-slate-300 px-1 py-2 transition-colors"
-          >
-            <span className="font-semibold">More charts</span>
-            <span className="text-base">{moreChartsOpen ? '▾' : '▸'}</span>
-          </button>
-          {moreChartsOpen && (
-            <div className="flex flex-col gap-4 mt-2">
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-                <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
-                <LbsLostChart logs={logs} participants={PARTICIPANTS} />
-              </div>
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-                <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
-                <PctLostChart logs={logs} participants={PARTICIPANTS} />
-              </div>
-            </div>
-          )}
-        </div>
+        <>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+            <h2 className="font-semibold text-sm text-slate-300 mb-4">Weight Over Time</h2>
+            <WeightChart logs={logs} participants={PARTICIPANTS} />
+          </div>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+            <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
+            <LbsLostChart logs={logs} participants={PARTICIPANTS} />
+          </div>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+            <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
+            <PctLostChart logs={logs} participants={PARTICIPANTS} />
+          </div>
+        </>
       )}
     </div>
   )
