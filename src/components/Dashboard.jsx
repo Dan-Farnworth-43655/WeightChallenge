@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
@@ -228,9 +229,31 @@ function StatCard({ stats }) {
   )
 }
 
+function StatCardWithRegression({ stats }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <StatCard stats={stats} />
+      {stats.regressionData && (
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+          <p className="text-xs text-slate-500 mb-3">21-day regression trend</p>
+          <RegressionChart
+            regressionData={stats.regressionData}
+            color={stats.participant.color}
+            goal={stats.goal}
+            startWeight={stats.effectiveStart}
+            goalDate={stats.goalDate}
+            milestones={stats.milestones}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser }) {
   const hasData = logs.length > 0
   const today = todayStr()
+  const [moreChartsOpen, setMoreChartsOpen] = useState(false)
 
   // PRs set today (Central Time) — banner expires at midnight CT
   const recentPRs = prs.filter(pr => pr.date === today)
@@ -246,6 +269,11 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
       banners.push({ participant: s.participant, pr, streak: hasStreak ? s.streak : 0 })
     }
   }
+
+  // Split the active user out of the ranked list so they go first
+  const myStats     = allStats.find(s => s.participant.id === activeUser)
+  const myLoggedToday = !!myStats?.logs?.some(l => l.date === today)
+  const otherStats  = ranked.filter(s => s.participant.id !== activeUser)
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
@@ -288,6 +316,25 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           </div>
         )
       })}
+
+      {/* "You haven't logged today" call-to-action — top priority if true */}
+      {hasData && myStats && !myLoggedToday && (
+        <div className="rounded-2xl border-2 border-red-500/50 bg-red-500/10 px-4 py-3 flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-red-300">You haven't logged today.</p>
+            <p className="text-xs text-slate-300 mt-0.5">Tap "Log Weight" at the bottom to keep your streak alive.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Your own card — first thing under banners so it's not buried */}
+      {hasData && myStats && (
+        <div className="flex flex-col gap-4">
+          <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
+          <StatCardWithRegression stats={myStats} />
+        </div>
+      )}
 
       {/* Group progress table — accountability view, not competition */}
       {hasData && (
@@ -338,63 +385,54 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       )}
 
-      {hasData && <Verse reference="Psalm 144:1" text="Praise be to the LORD my Rock, who trains my hands for war, my fingers for battle." />}
-
-      {/* Weight trend chart */}
+      {/* Anchor verse — one well-placed reminder of why we're doing this */}
       {hasData && (
-        <>
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-            <h2 className="font-semibold text-sm text-slate-300 mb-4">Weight Over Time</h2>
-            <WeightChart logs={logs} participants={PARTICIPANTS} />
-          </div>
-          <Verse reference="Ecclesiastes 4:9-10" text="Two are better than one... if either of them falls down, one can help the other up." />
-        </>
+        <Verse
+          reference="Ecclesiastes 4:9-10"
+          text="Two are better than one... if either of them falls down, one can help the other up."
+        />
       )}
 
-      {/* Lbs lost chart */}
+      {/* Group weight trend chart — the one most useful group chart */}
       {hasData && (
-        <>
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-            <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
-            <LbsLostChart logs={logs} participants={PARTICIPANTS} />
-          </div>
-          <Verse reference="1 Thessalonians 5:11" text="Therefore encourage one another and build each other up." />
-        </>
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+          <h2 className="font-semibold text-sm text-slate-300 mb-4">Weight Over Time</h2>
+          <WeightChart logs={logs} participants={PARTICIPANTS} />
+        </div>
       )}
 
-      {/* % Lost chart */}
-      {hasData && (
-        <>
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-            <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
-            <PctLostChart logs={logs} participants={PARTICIPANTS} />
-          </div>
-          <Verse reference="Colossians 3:23" text="Whatever you do, work at it with all your heart, as working for the Lord." />
-        </>
-      )}
-
-      {/* Individual stat cards */}
-      {hasData && (
+      {/* Teammates' individual stat cards (active user excluded — already shown above) */}
+      {hasData && otherStats.length > 0 && (
         <div className="flex flex-col gap-4">
-          <h2 className="font-semibold text-sm text-slate-300">Individual Stats</h2>
-          {ranked.map(stats => (
-            <div key={stats.participant.id} className="flex flex-col gap-2">
-              <StatCard stats={stats} />
-              {stats.regressionData && (
-                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-                  <p className="text-xs text-slate-500 mb-3">21-day regression trend</p>
-                  <RegressionChart
-                    regressionData={stats.regressionData}
-                    color={stats.participant.color}
-                    goal={stats.goal}
-                    startWeight={stats.effectiveStart}
-                    goalDate={stats.goalDate}
-                    milestones={stats.milestones}
-                  />
-                </div>
-              )}
-            </div>
+          <h2 className="font-semibold text-sm text-slate-300">Everyone Else</h2>
+          {otherStats.map(stats => (
+            <StatCardWithRegression key={stats.participant.id} stats={stats} />
           ))}
+        </div>
+      )}
+
+      {/* Collapsible additional charts — less critical day-to-day */}
+      {hasData && (
+        <div>
+          <button
+            onClick={() => setMoreChartsOpen(o => !o)}
+            className="w-full flex items-center justify-between text-xs uppercase tracking-wider text-slate-500 hover:text-slate-300 px-1 py-2 transition-colors"
+          >
+            <span className="font-semibold">More charts</span>
+            <span className="text-base">{moreChartsOpen ? '▾' : '▸'}</span>
+          </button>
+          {moreChartsOpen && (
+            <div className="flex flex-col gap-4 mt-2">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
+                <LbsLostChart logs={logs} participants={PARTICIPANTS} />
+              </div>
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
+                <PctLostChart logs={logs} participants={PARTICIPANTS} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
