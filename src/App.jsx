@@ -3,6 +3,7 @@ import { fetchLogs, postLog, fetchPRs, fetchGoals } from './api'
 import { PARTICIPANTS, applyGoalOverride, computeStats, sortByGoalProgress, todayStr } from './utils/calculations'
 import NameSelector from './components/NameSelector'
 import Dashboard from './components/Dashboard'
+import Calendar from './components/Calendar'
 import LogWeight from './components/LogWeight'
 
 const POLL_INTERVAL = 30000 // refresh every 30s
@@ -129,6 +130,8 @@ export default function App() {
           <div className="flex items-center justify-center h-64 text-slate-400">Loading…</div>
         ) : tab === 'dashboard' ? (
           <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} onGoalsChanged={loadLogs} />
+        ) : tab === 'calendar' ? (
+          <Calendar participant={activeParticipant} stats={myStats} />
         ) : (
           <LogWeight
             participant={activeParticipant}
@@ -151,6 +154,17 @@ export default function App() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
           Dashboard
+        </button>
+        <button
+          onClick={() => setTab('calendar')}
+          className={`flex-1 py-4 flex flex-col items-center gap-1 text-xs font-medium transition-colors ${
+            tab === 'calendar' ? 'text-sky-400' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Calendar
         </button>
         <button
           onClick={() => setTab('log')}

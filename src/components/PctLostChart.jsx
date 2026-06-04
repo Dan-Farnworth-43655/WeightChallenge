@@ -1,18 +1,16 @@
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
-import { formatDate, ACCOUNTABILITY_START } from '../utils/calculations'
+import { formatDate } from '../utils/calculations'
 
 function buildChartData(logs, participants) {
-  // Only consider logs from the accountability era
-  const eraLogs = logs.filter(l => l.date >= ACCOUNTABILITY_START)
-  const dateSet = new Set(eraLogs.map(l => l.date))
+  const dateSet = new Set(logs.map(l => l.date))
   const dates = [...dateSet].sort()
 
-  // Per-participant baseline = their first log in the accountability era
+  // Per-participant baseline = their absolute first log (lifetime view)
   const effectiveStart = {}
   for (const p of participants) {
-    const first = eraLogs.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
+    const first = logs.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
     effectiveStart[p.id] = first ? first.weight : null
   }
 
@@ -21,7 +19,7 @@ function buildChartData(logs, participants) {
     for (const p of participants) {
       const start = effectiveStart[p.id]
       if (start == null) continue
-      const entry = eraLogs.find(l => l.participant === p.id && l.date === date)
+      const entry = logs.find(l => l.participant === p.id && l.date === date)
       if (entry) {
         point[p.id] = parseFloat(((start - entry.weight) / start * 100).toFixed(2))
       }
