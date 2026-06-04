@@ -1,3 +1,10 @@
+// Date after which we count progress for accountability stats. Logs before this
+// date are kept in the database and still appear on charts, but they don't count
+// toward "lbs lost", "% lost", or the goal-progress baseline. This way the original
+// competition data doesn't inflate post-competition accountability numbers.
+// Change this if the group ever wants to "reset" their tracker.
+export const ACCOUNTABILITY_START = '2026-05-22'
+
 // Participant configuration — each person has their own goal and milestones.
 // Goals: { weight, date }. Milestones: array of { weight, date } (date optional).
 // Milestones should be ordered from highest weight to lowest (i.e. earliest to latest in the journey).
@@ -73,7 +80,11 @@ export function computeStats(participant, logs) {
     .sort((a, b) => a.date.localeCompare(b.date))
 
   const weighIns = myLogs.length
-  const effectiveStart = weighIns > 0 ? myLogs[0].weight : null
+  // Accountability-era baseline: first log on or after ACCOUNTABILITY_START.
+  // Falls back to absolute first log if they haven't logged in the new era yet.
+  const eraLogs = myLogs.filter(l => l.date >= ACCOUNTABILITY_START)
+  const baselineLog = eraLogs[0] ?? myLogs[0]
+  const effectiveStart = baselineLog?.weight ?? null
   const current = weighIns > 0 ? myLogs[myLogs.length - 1].weight : null
 
   // Goal

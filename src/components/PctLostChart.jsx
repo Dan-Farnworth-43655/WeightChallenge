@@ -1,21 +1,19 @@
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
-import { formatDate } from '../utils/calculations'
+import { formatDate, ACCOUNTABILITY_START } from '../utils/calculations'
 
 function buildChartData(logs, participants) {
-  const dateSet = new Set(logs.map(l => l.date))
+  // Only consider logs from the accountability era
+  const eraLogs = logs.filter(l => l.date >= ACCOUNTABILITY_START)
+  const dateSet = new Set(eraLogs.map(l => l.date))
   const dates = [...dateSet].sort()
 
-  // Resolve effective start weight per participant (observers use their first log)
+  // Per-participant baseline = their first log in the accountability era
   const effectiveStart = {}
   for (const p of participants) {
-    if (p.startWeight != null) {
-      effectiveStart[p.id] = p.startWeight
-    } else {
-      const first = logs.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
-      effectiveStart[p.id] = first ? first.weight : null
-    }
+    const first = eraLogs.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
+    effectiveStart[p.id] = first ? first.weight : null
   }
 
   return dates.map(date => {
@@ -23,7 +21,7 @@ function buildChartData(logs, participants) {
     for (const p of participants) {
       const start = effectiveStart[p.id]
       if (start == null) continue
-      const entry = logs.find(l => l.participant === p.id && l.date === date)
+      const entry = eraLogs.find(l => l.participant === p.id && l.date === date)
       if (entry) {
         point[p.id] = parseFloat(((start - entry.weight) / start * 100).toFixed(2))
       }
