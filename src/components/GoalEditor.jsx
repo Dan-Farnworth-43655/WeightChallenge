@@ -63,33 +63,28 @@ export default function GoalEditor({ participant, currentGoal, currentMilestones
 
         {/* Final Goal */}
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 mb-4">
-          <p className="text-xs uppercase tracking-wider text-amber-400 font-bold mb-2">🎯 Final Goal</p>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-[10px] text-slate-400 mb-1">Goal weight (lbs)</label>
-              <input
-                type="number" step="0.1" value={goalWeight}
-                onChange={e => setGoalWeight(e.target.value)}
-                placeholder="e.g. 185"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                inputMode="decimal"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-[10px] text-slate-400 mb-1">By date</label>
-              <input
-                type="date" value={goalDate}
-                onChange={e => setGoalDate(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <p className="text-[10px] uppercase tracking-wider text-amber-400 font-bold mb-2">🎯 Final Goal</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number" step="0.1" value={goalWeight}
+              onChange={e => setGoalWeight(e.target.value)}
+              placeholder="lbs"
+              className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white text-center tabular-nums focus:outline-none focus:border-amber-500"
+              inputMode="decimal"
+            />
+            <span className="text-xs text-slate-400">by</span>
+            <input
+              type="date" value={goalDate}
+              onChange={e => setGoalDate(e.target.value)}
+              className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+            />
           </div>
         </div>
 
         {/* Milestones */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">Milestones</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Milestones</p>
             <button onClick={addMilestone} className="text-xs font-semibold text-sky-400 hover:text-sky-300">+ Add</button>
           </div>
           {milestones.length === 0 ? (
@@ -97,31 +92,26 @@ export default function GoalEditor({ participant, currentGoal, currentMilestones
           ) : (
             <div className="flex flex-col gap-2">
               {milestones.map((m, i) => (
-                <div key={i} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="block text-[10px] text-slate-500 mb-1">Weight</label>
-                    <input
-                      type="number" step="0.1" value={m.weight}
-                      onChange={e => setMilestone(i, 'weight', e.target.value)}
-                      placeholder="lbs"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500"
-                      inputMode="decimal"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] text-slate-500 mb-1">By date (optional)</label>
-                    <input
-                      type="date" value={m.date}
-                      onChange={e => setMilestone(i, 'date', e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500"
-                    />
-                  </div>
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="number" step="0.1" value={m.weight}
+                    onChange={e => setMilestone(i, 'weight', e.target.value)}
+                    placeholder="lbs"
+                    className="w-20 shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white text-center tabular-nums focus:outline-none focus:border-sky-500"
+                    inputMode="decimal"
+                  />
+                  <span className="text-xs text-slate-500 shrink-0">by</span>
+                  <input
+                    type="date" value={m.date}
+                    onChange={e => setMilestone(i, 'date', e.target.value)}
+                    className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-sky-500"
+                  />
                   <button
                     onClick={() => removeMilestone(i)}
-                    className="text-slate-500 hover:text-red-400 p-1.5 mb-0.5"
-                    aria-label="Remove"
+                    className="text-slate-500 hover:text-red-400 text-lg leading-none w-7 h-7 flex items-center justify-center rounded shrink-0"
+                    aria-label="Remove milestone"
                     title="Remove"
-                  >🗑️</button>
+                  >×</button>
                 </div>
               ))}
             </div>
