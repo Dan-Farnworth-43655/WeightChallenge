@@ -59,6 +59,7 @@ export default function App() {
   const allStats = PARTICIPANTS.map(p => computeStats(p, logs))
   const ranked = sortByGoalProgress(allStats)
   const activeParticipant = PARTICIPANTS.find(p => p.id === activeUser)
+  const myStats = allStats.find(s => s.participant.id === activeUser)
 
   if (!activeUser) {
     return <NameSelector onSelect={setActiveUser} />
@@ -68,13 +69,38 @@ export default function App() {
     <div className="flex flex-col min-h-screen max-w-2xl mx-auto">
       <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg font-bold leading-tight">Accountability Tracker</h1>
-            <p className="text-xs text-slate-400">One day at a time</p>
+            {myStats?.current != null ? (
+              <p className="text-xs text-slate-400 truncate">
+                <span className="text-slate-200 font-semibold tabular-nums">{myStats.current.toFixed(1)} lbs</span>
+                {myStats.nextMilestone && !myStats.goalHit ? (
+                  <>
+                    {' '}·{' '}
+                    <span className="text-slate-300">
+                      {Math.max(0, myStats.current - myStats.nextMilestone.weight).toFixed(1)}
+                    </span>
+                    {' '}to {myStats.nextMilestone.weight}
+                  </>
+                ) : myStats.goal != null && !myStats.goalHit ? (
+                  <>
+                    {' '}·{' '}
+                    <span className="text-slate-300">
+                      {Math.max(0, myStats.current - myStats.goal).toFixed(1)}
+                    </span>
+                    {' '}to goal 🎯
+                  </>
+                ) : myStats.goalHit ? (
+                  <> · <span className="text-emerald-400 font-semibold">✓ At goal</span></>
+                ) : null}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400">One day at a time</p>
+            )}
           </div>
           <button
             onClick={() => setActiveUser(null)}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors shrink-0 ml-3"
           >
             <span
               className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"

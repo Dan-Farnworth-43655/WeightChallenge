@@ -4,6 +4,25 @@ import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
 import RegressionChart from './RegressionChart'
 
+// Rotating verses — picked deterministically by day-of-year so the same verse
+// shows for the entire day across page reloads, but rotates each day.
+const VERSES = [
+  { reference: 'Ecclesiastes 4:9-10', text: 'Two are better than one... if either of them falls down, one can help the other up.' },
+  { reference: 'Proverbs 27:17',      text: 'As iron sharpens iron, so one person sharpens another.' },
+  { reference: '1 Thessalonians 5:11', text: 'Therefore encourage one another and build each other up.' },
+  { reference: 'Colossians 3:23',     text: 'Whatever you do, work at it with all your heart, as working for the Lord.' },
+  { reference: 'Hebrews 12:1',        text: 'Let us run with perseverance the race marked out for us.' },
+  { reference: 'Philippians 4:13',    text: 'I can do all this through him who gives me strength.' },
+  { reference: 'Galatians 6:9',       text: 'Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.' },
+]
+
+function todaysVerse() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const dayOfYear = Math.floor((now - start) / 86400000)
+  return VERSES[dayOfYear % VERSES.length]
+}
+
 function Verse({ reference, text }) {
   return (
     <div className="text-center px-4 py-1">
@@ -382,6 +401,17 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
               })}
             </tbody>
           </table>
+          {/* Group totals — collective achievement footer */}
+          {(() => {
+            const totalWeighIns = allStats.reduce((s, st) => s + st.weighIns, 0)
+            const totalLost = allStats.reduce((s, st) => s + Math.max(0, st.lost ?? 0), 0)
+            return (totalWeighIns > 0 || totalLost > 0) ? (
+              <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
+                <span>Together: <span className="font-bold text-slate-200 tabular-nums">{totalLost.toFixed(1)} lbs</span> lost</span>
+                <span><span className="font-bold text-slate-200 tabular-nums">{totalWeighIns}</span> weigh-ins logged</span>
+              </div>
+            ) : null
+          })()}
         </div>
       )}
 
@@ -408,13 +438,11 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       )}
 
-      {/* Anchor verse — one well-placed reminder of why we're doing this */}
-      {hasData && (
-        <Verse
-          reference="Ecclesiastes 4:9-10"
-          text="Two are better than one... if either of them falls down, one can help the other up."
-        />
-      )}
+      {/* Anchor verse — rotates daily through a set of accountability-themed verses */}
+      {hasData && (() => {
+        const v = todaysVerse()
+        return <Verse reference={v.reference} text={v.text} />
+      })()}
 
       {/* Teammates' individual stat cards (active user excluded — already shown above) */}
       {hasData && otherStats.length > 0 && (

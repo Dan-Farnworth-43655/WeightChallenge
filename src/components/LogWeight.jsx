@@ -146,6 +146,7 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
   const [editWeight, setEditWeight] = useState('')
   const [deletingDate, setDeletingDate] = useState(null)
   const [modalQueue, setModalQueue] = useState([]) // ordered list of modals to show
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   const todayEntry = stats?.logs?.find(l => l.date === date)
 
@@ -227,7 +228,10 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
 
   const dismissModal = () => setModalQueue(q => q.slice(1))
 
-  const sortedLogs = [...(stats?.logs ?? [])].sort((a, b) => b.date.localeCompare(a.date))
+  const allSortedLogs = [...(stats?.logs ?? [])].sort((a, b) => b.date.localeCompare(a.date))
+  const RECENT_LIMIT = 14
+  const sortedLogs = historyExpanded ? allSortedLogs : allSortedLogs.slice(0, RECENT_LIMIT)
+  const hiddenCount = Math.max(0, allSortedLogs.length - RECENT_LIMIT)
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
@@ -296,8 +300,11 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
       {/* History */}
       {sortedLogs.length > 0 && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-800">
+          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
             <h2 className="font-semibold text-sm text-slate-300">My Weigh-in History</h2>
+            <span className="text-xs text-slate-500 tabular-nums">
+              {historyExpanded ? `${allSortedLogs.length} total` : `Last ${Math.min(RECENT_LIMIT, allSortedLogs.length)}`}
+            </span>
           </div>
           <div className="divide-y divide-slate-800">
             {sortedLogs.map((log, i) => {
@@ -369,6 +376,14 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
               )
             })}
           </div>
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setHistoryExpanded(e => !e)}
+              className="w-full px-4 py-3 text-xs font-semibold uppercase tracking-wider text-sky-400 hover:text-sky-300 hover:bg-slate-800/50 transition-colors border-t border-slate-800"
+            >
+              {historyExpanded ? `Show last ${RECENT_LIMIT}` : `Show all ${allSortedLogs.length} entries`}
+            </button>
+          )}
         </div>
       )}
     </div>
