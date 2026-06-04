@@ -222,6 +222,25 @@ export function computeStats(participant, logs) {
     if (!logStreakAtRisk) logStreak = 0
   }
 
+  // Best logging streak ever: longest run of consecutive calendar days with a log
+  let bestLogStreak = 0
+  if (myLogs.length > 0) {
+    const sortedDates = [...new Set(myLogs.map(l => l.date))].sort()
+    let run = 1
+    bestLogStreak = 1
+    for (let i = 1; i < sortedDates.length; i++) {
+      const prevD = new Date(sortedDates[i - 1] + 'T00:00:00')
+      const currD = new Date(sortedDates[i] + 'T00:00:00')
+      const diff = Math.round((currD - prevD) / 86400000)
+      if (diff === 1) {
+        run++
+        if (run > bestLogStreak) bestLogStreak = run
+      } else {
+        run = 1
+      }
+    }
+  }
+
   // Days since last log (for "you haven't logged in X days" indicator)
   let daysSinceLastLog = null
   if (myLogs.length > 0) {
@@ -367,6 +386,7 @@ export function computeStats(participant, logs) {
     prevBestStreak,
     logStreak,
     logStreakAtRisk,
+    bestLogStreak,
     daysSinceLastLog,
     nextProjection,
     dowAnalysis,

@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
 import RegressionChart from './RegressionChart'
 import GoalEditor from './GoalEditor'
+import BadgeWall from './BadgeWall'
+import BadgeUnlockToast from './BadgeUnlockToast'
+import { BADGES, earnedBadges } from '../utils/badges'
 
 // Rotating verses — picked deterministically by day-of-year so the same verse
 // shows for the entire day across page reloads, but rotates each day.
@@ -389,6 +392,26 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const hasData = logs.length > 0
   const today = todayStr()
   const [editingGoals, setEditingGoals] = useState(false)
+  const [unlockQueue, setUnlockQueue] = useState([])
+
+  // Detect newly earned badges for the active user and queue toasts
+  useEffect(() => {
+    if (!activeUser) return
+    const me = allStats.find(s => s.participant.id === activeUser)
+    if (!me) return
+    const earned = earnedBadges(me)
+    const key = `seen_badges_${activeUser}`
+    let seen = []
+    try { seen = JSON.parse(localStorage.getItem(key) ?? '[]') } catch (e) { seen = [] }
+    const newly = earned.filter(id => !seen.includes(id))
+    if (newly.length > 0) {
+      const newBadges = newly.map(id => BADGES.find(b => b.id === id)).filter(Boolean)
+      setUnlockQueue(newBadges)
+      try { localStorage.setItem(key, JSON.stringify(earned)) } catch (e) {}
+    }
+  }, [activeUser, allStats])
+
+  const dismissUnlock = () => setUnlockQueue(q => q.slice(1))
 
   // PRs set today (Central Time) — banner expires at midnight CT
   const recentPRs = prs.filter(pr => pr.date === today)
@@ -555,6 +578,16 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       )}
 
+      {/* Badge unlock toast — fires when active user newly earns one */}
+      {unlockQueue.length > 0 && myStats && (
+        <BadgeUnlockToast
+          badge={unlockQueue[0]}
+          participant={myStats.participant}
+          queueLength={unlockQueue.length}
+          onClose={dismissUnlock}
+        />
+      )}
+
       {/* Goal editor modal — for the active user only */}
       {editingGoals && myStats && (
         <GoalEditor
@@ -581,6 +614,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           ))}
         </div>
       )}
+
+      {/* Wall of Fame — group-wide badge gallery */}
+      {hasData && <BadgeWall allStats={allStats} />}
 
       {/* Group trend charts — moved to the bottom of the dashboard */}
       {hasData && (
