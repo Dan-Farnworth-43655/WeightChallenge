@@ -95,6 +95,45 @@ function hadOnederland(stats) {
   return (stats.logs ?? []).some(l => l.weight < 200)
 }
 
+// New Decade: crossed into a lower 10-lb range at any point.
+// E.g., started in 220s and any log <= 219.9 → earned.
+function hadNewDecade(stats) {
+  if (!stats.effectiveStart) return false
+  const startDecade = Math.floor(stats.effectiveStart / 10)
+  return (stats.logs ?? []).some(l => Math.floor(l.weight / 10) < startDecade)
+}
+
+// Maintenance Mode: after first hitting goal, 28+ days where every log stayed
+// within [goal - 2, goal + 2] (didn't bounce back up or way past it).
+function hadMaintenanceMode(stats) {
+  if (stats.goal == null) return false
+  const lower = stats.goal - 2
+  const upper = stats.goal + 2
+  const sorted = [...(stats.logs ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+  const firstHitIdx = sorted.findIndex(l => l.weight <= stats.goal)
+  if (firstHitIdx === -1) return false
+  let runStart = null
+  let lastInRange = null
+  for (let i = firstHitIdx; i < sorted.length; i++) {
+    const log = sorted[i]
+    if (log.weight >= lower && log.weight <= upper) {
+      if (runStart == null) runStart = log.date
+      lastInRange = log.date
+      const days = (new Date(lastInRange) - new Date(runStart)) / 86400000
+      if (days >= 28) return true
+    } else {
+      runStart = null
+      lastInRange = null
+    }
+  }
+  return false
+}
+
+// "Best weekly streak ever" = max(current, prevBest) — used by Wave/Tide/Current.
+function bestWeeklyStreakEver(stats) {
+  return Math.max(stats.streak ?? 0, stats.prevBestStreak ?? 0)
+}
+
 // All achievement badges. `check(stats)` returns true if the participant has earned it.
 // Order matters — displayed in this order on the wall.
 export const BADGES = [
@@ -145,6 +184,22 @@ export const BADGES = [
     description: 'First log below 200 lbs',
     check: hadOnederland },
 
+  // ── New Decade — crossed into a lower 10-lb range ──
+  { id: 'new-decade', emoji: '📉', name: 'New Decade', category: 'progress',
+    description: 'Crossed into a lower 10-lb range',
+    check: hadNewDecade },
+
+  // ── Weekly downtrend streaks ──
+  { id: 'wave',    emoji: '🌊', name: 'Wave',    category: 'progress',
+    description: '4 consecutive weeks of weekly-avg loss',
+    check: s => bestWeeklyStreakEver(s) >= 4 },
+  { id: 'tide',    emoji: '🌀', name: 'Tide',    category: 'progress',
+    description: '8 consecutive weeks of weekly-avg loss',
+    check: s => bestWeeklyStreakEver(s) >= 8 },
+  { id: 'current', emoji: '⚡', name: 'Current', category: 'progress',
+    description: '12 consecutive weeks of weekly-avg loss',
+    check: s => bestWeeklyStreakEver(s) >= 12 },
+
   // ── Goal achievements ──
   // First Milestone fires if any configured milestone was hit, OR you've simply
   // lost 5+ lbs total — recognizing real progress for anyone who hasn't set
@@ -161,6 +216,9 @@ export const BADGES = [
   { id: 'past-goal',       emoji: '🚀', name: 'Past Goal',       category: 'goals',
     description: '14+ days sustained 1+ lb below your goal',
     check: hadSustainedPastGoal },
+  { id: 'maintenance',     emoji: '🛡️', name: 'Maintenance Mode', category: 'goals',
+    description: '4 weeks staying within 2 lbs of your goal',
+    check: hadMaintenanceMode },
 
   // ── Commitment / time tracking ──
   { id: 'month-one', emoji: '📅', name: 'Month One', category: 'commitment',
