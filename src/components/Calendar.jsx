@@ -2,10 +2,21 @@ import { useState } from 'react'
 
 // Personal logging calendar — month grid showing logged / missed / future / pre-start days.
 // Don't break the chain energy: visually addictive to keep the row of green.
-export default function Calendar({ participant, stats }) {
+// Switcher at top lets you flip to any teammate's calendar without leaving the tab.
+export default function Calendar({ allStats = [], initialParticipantId }) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const [viewedId, setViewedId] = useState(initialParticipantId)
   const [viewMonth, setViewMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+
+  // Resolve currently-selected participant from allStats (fallback to first)
+  const selectedStats = allStats.find(s => s.participant.id === viewedId) ?? allStats[0]
+  const participant = selectedStats?.participant
+  const stats = selectedStats
+
+  if (!participant) {
+    return <div className="px-4 py-6 text-center text-slate-500 text-sm">No participant data.</div>
+  }
 
   // Build lookup of logged weight + delta-vs-previous by date.
   // delta is positive = gained, negative = lost, 0 = flat. null = first log (no prior).
@@ -59,6 +70,33 @@ export default function Calendar({ participant, stats }) {
 
   return (
     <div className="px-4 py-4 flex flex-col gap-4">
+      {/* Participant switcher */}
+      <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+        {allStats.map(s => {
+          const p = s.participant
+          const active = p.id === participant.id
+          return (
+            <button
+              key={p.id}
+              onClick={() => setViewedId(p.id)}
+              className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                active ? 'shadow-md' : 'opacity-50 hover:opacity-100'
+              }`}
+              style={
+                active
+                  ? { backgroundColor: p.color, color: '#000' }
+                  : { backgroundColor: p.color + '22', color: p.color, border: `1px solid ${p.color}44` }
+              }
+            >
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black bg-black/20">
+                {p.initials}
+              </span>
+              {p.name}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Header */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
         <div className="flex items-center gap-2 mb-2">

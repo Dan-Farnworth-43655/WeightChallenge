@@ -180,7 +180,7 @@ export default function App() {
         ) : tab === 'dashboard' ? (
           <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} onGoalsChanged={loadLogs} />
         ) : tab === 'calendar' ? (
-          <Calendar participant={activeParticipant} stats={myStats} />
+          <Calendar allStats={allStats} initialParticipantId={activeUser} />
         ) : (
           <LogWeight
             participant={activeParticipant}
