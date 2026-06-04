@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchLogs, postLog, fetchPRs } from './api'
 import { PARTICIPANTS, computeStats, sortByGoalProgress, todayStr } from './utils/calculations'
-import { seedInitialData } from './utils/seed'
 import NameSelector from './components/NameSelector'
 import Dashboard from './components/Dashboard'
 import LogWeight from './components/LogWeight'
@@ -14,7 +13,6 @@ export default function App() {
   const [prs, setPrs] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
-  const [seeded, setSeeded] = useState(false)
 
   useEffect(() => {
     if (activeUser) localStorage.setItem('wt_user', activeUser)
@@ -51,12 +49,6 @@ export default function App() {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [loadLogs])
-
-  async function handleSeed() {
-    await seedInitialData()
-    await loadLogs()
-    setSeeded(true)
-  }
 
   async function logWeight(participant, date, weight) {
     const result = await postLog(participant, date, parseFloat(weight))

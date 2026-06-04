@@ -135,14 +135,14 @@ function StatCard({ stats }) {
                   ? 'text-amber-300 bg-amber-500/10 border-amber-500/40'
                   : 'text-sky-300 bg-sky-500/10 border-sky-500/30'
               }`}
-              title={logStreakAtRisk ? 'Log today to save your streak!' : 'Consecutive days logged'}
+              title={logStreakAtRisk ? 'Log today to save your streak!' : `${logStreak} consecutive days logged`}
             >
-              🗓️ {logStreak}{logStreakAtRisk ? '!' : ''}
+              🗓️ {logStreak}d{logStreakAtRisk ? '!' : ''}
             </span>
           )}
           {streak >= 2 && (
-            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss streak (weekly average down)`}>
-              🔥 {streak}wk
+            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week downtrend (weekly average down)`}>
+              🔥 {streak}w
             </span>
           )}
         </div>
@@ -159,7 +159,7 @@ function StatCard({ stats }) {
           <div className="flex justify-between text-xs text-slate-400 mb-1">
             <span>Goal progress</span>
             <span style={{ color: isGaining ? '#f87171' : p.color }}>
-              {Math.round(pctToGoal * 100)}%
+              {Math.round(Math.min(1, pctToGoal) * 100)}%
             </span>
           </div>
           <ProgressBar pct={pctToGoal} color={p.color} />
