@@ -22,6 +22,22 @@ export async function fetchPRs() {
   return res.json()
 }
 
+export async function fetchGoals() {
+  const res = await fetch(`/api/goals`)
+  if (!res.ok) throw new Error('Failed to fetch goals')
+  return res.json() // { [participantId]: { goal, milestones } }
+}
+
+export async function saveGoals(participant, goal, milestones) {
+  const res = await fetch(`/api/goals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participant, goal, milestones }),
+  })
+  if (!res.ok) throw new Error('Failed to save goals')
+  return res.json()
+}
+
 export async function deleteLog(participant, date) {
   const res = await fetch(`/api/log`, {
     method: 'DELETE',

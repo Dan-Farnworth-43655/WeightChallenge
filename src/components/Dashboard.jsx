@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
 import RegressionChart from './RegressionChart'
+import GoalEditor from './GoalEditor'
 
 // Rotating verses — picked deterministically by day-of-year so the same verse
 // shows for the entire day across page reloads, but rotates each day.
@@ -280,9 +282,10 @@ function StatCardWithRegression({ stats }) {
   )
 }
 
-export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser }) {
+export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser, onGoalsChanged }) {
   const hasData = logs.length > 0
   const today = todayStr()
+  const [editingGoals, setEditingGoals] = useState(false)
 
   // PRs set today (Central Time) — banner expires at midnight CT
   const recentPRs = prs.filter(pr => pr.date === today)
@@ -433,9 +436,28 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
       {/* Your own card */}
       {hasData && myStats && (
         <div className="flex flex-col gap-4">
-          <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
+            <button
+              onClick={() => setEditingGoals(true)}
+              className="text-xs text-slate-500 hover:text-sky-400 transition-colors font-semibold"
+            >
+              ⚙️ Edit goal
+            </button>
+          </div>
           <StatCardWithRegression stats={myStats} />
         </div>
+      )}
+
+      {/* Goal editor modal — for the active user only */}
+      {editingGoals && myStats && (
+        <GoalEditor
+          participant={myStats.participant}
+          currentGoal={myStats.participant.goal}
+          currentMilestones={myStats.participant.milestones ?? []}
+          onClose={() => setEditingGoals(false)}
+          onSaved={() => { onGoalsChanged?.(); setEditingGoals(false) }}
+        />
       )}
 
       {/* Anchor verse — rotates daily through a set of accountability-themed verses */}

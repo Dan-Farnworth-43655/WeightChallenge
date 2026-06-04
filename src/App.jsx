@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchLogs, postLog, fetchPRs } from './api'
-import { PARTICIPANTS, computeStats, sortByGoalProgress, todayStr } from './utils/calculations'
+import { fetchLogs, postLog, fetchPRs, fetchGoals } from './api'
+import { PARTICIPANTS, applyGoalOverride, computeStats, sortByGoalProgress, todayStr } from './utils/calculations'
 import NameSelector from './components/NameSelector'
 import Dashboard from './components/Dashboard'
 import LogWeight from './components/LogWeight'
@@ -11,6 +11,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState(() => localStorage.getItem('wt_user') || null)
   const [logs, setLogs] = useState([])
   const [prs, setPrs] = useState([])
+  const [goalOverrides, setGoalOverrides] = useState({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
 
@@ -32,6 +33,12 @@ export default function App() {
       setPrs(prData)
     } catch (e) {
       console.error('fetchPRs failed:', e)
+    }
+    try {
+      const goalsData = await fetchGoals()
+      setGoalOverrides(goalsData)
+    } catch (e) {
+      console.error('fetchGoals failed:', e)
     }
     setLoading(false)
   }, [])
@@ -56,7 +63,7 @@ export default function App() {
     return result // passes { ok, isPR } back to LogWeight for confetti
   }
 
-  const allStats = PARTICIPANTS.map(p => computeStats(p, logs))
+  const allStats = PARTICIPANTS.map(p => computeStats(applyGoalOverride(p, goalOverrides), logs))
   const ranked = sortByGoalProgress(allStats)
   const activeParticipant = PARTICIPANTS.find(p => p.id === activeUser)
   const myStats = allStats.find(s => s.participant.id === activeUser)
@@ -121,7 +128,7 @@ export default function App() {
         {loading ? (
           <div className="flex items-center justify-center h-64 text-slate-400">Loading…</div>
         ) : tab === 'dashboard' ? (
-          <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} />
+          <Dashboard ranked={ranked} allStats={allStats} logs={logs} prs={prs} activeUser={activeUser} onGoalsChanged={loadLogs} />
         ) : (
           <LogWeight
             participant={activeParticipant}

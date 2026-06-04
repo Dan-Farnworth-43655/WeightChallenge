@@ -71,6 +71,22 @@ function mondayOf(dateStr) {
 }
 
 /**
+ * Merge a Redis-stored goal override into the participant config. Returns a new
+ * participant object with goal + milestones replaced if an override exists.
+ * If no override, returns the participant unchanged.
+ */
+export function applyGoalOverride(participant, overrides) {
+  if (!overrides) return participant
+  const override = overrides[participant.id]
+  if (!override) return participant
+  return {
+    ...participant,
+    goal:       override.goal ?? participant.goal,
+    milestones: Array.isArray(override.milestones) ? override.milestones : participant.milestones,
+  }
+}
+
+/**
  * Build per-participant stats from a list of log entries.
  * logs: [{ participant, date (YYYY-MM-DD), weight }]
  */
