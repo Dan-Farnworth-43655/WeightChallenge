@@ -342,13 +342,29 @@ function StatCard({ stats }) {
         </div>
       )}
 
-      {/* Insight: best day of week (only show if we have enough data) */}
-      {dowAnalysis?.best && dowAnalysis.best.avg < 0 && (
-        <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs flex items-center gap-2">
-          <span className="text-base leading-none">📊</span>
-          <div className="flex-1 leading-tight text-slate-300">
-            Best day: <span className="font-bold text-sky-300">{dowAnalysis.best.name}s</span>
-            {' '}(avg <span className="font-semibold tabular-nums text-emerald-300">{dowAnalysis.best.avg.toFixed(2)} lbs</span>)
+      {/* Insight: best & worst day-of-week */}
+      {dowAnalysis && (dowAnalysis.best || dowAnalysis.worst) && (
+        <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs flex items-start gap-2">
+          <span className="text-base leading-none mt-0.5">📊</span>
+          <div className="flex-1 leading-tight text-slate-300 space-y-0.5">
+            {dowAnalysis.best && (
+              <div>
+                Best day: <span className="font-bold text-sky-300">{dowAnalysis.best.name}s</span>
+                {' '}(avg{' '}
+                <span className={`font-semibold tabular-nums ${dowAnalysis.best.avg <= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {dowAnalysis.best.avg > 0 ? '+' : ''}{dowAnalysis.best.avg.toFixed(2)} lbs
+                </span>)
+              </div>
+            )}
+            {dowAnalysis.worst && dowAnalysis.worst.dow !== dowAnalysis.best?.dow && (
+              <div>
+                Worst day: <span className="font-bold text-red-300">{dowAnalysis.worst.name}s</span>
+                {' '}(avg{' '}
+                <span className={`font-semibold tabular-nums ${dowAnalysis.worst.avg > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                  {dowAnalysis.worst.avg > 0 ? '+' : ''}{dowAnalysis.worst.avg.toFixed(2)} lbs
+                </span>)
+              </div>
+            )}
           </div>
         </div>
       )}
