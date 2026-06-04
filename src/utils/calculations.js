@@ -164,11 +164,13 @@ export function computeStats(participant, logs) {
     ? remaining / daysToGoalDate
     : 0
 
-  // Milestone progress — for each milestone, has it been hit? Earliest log date that
-  // first dropped to or below the milestone weight wins.
+  // Milestone progress — a milestone is "hit" only if CURRENT weight is at or
+  // below the milestone. If they briefly dropped under and bounced back above,
+  // the milestone reverts to un-hit. hitDate still records the earliest
+  // historical crossing for context.
   const milestones = (participant.milestones ?? []).map(m => {
     const hitLog = myLogs.find(l => l.weight <= m.weight)
-    const hit = !!hitLog
+    const hit    = current != null && current <= m.weight
     const targetDate = m.date ? parseDate(m.date) : null
     const daysToTarget = targetDate ? Math.max(0, daysBetween(today, targetDate)) : null
     const remainingToMilestone = current != null ? Math.max(0, current - m.weight) : null
