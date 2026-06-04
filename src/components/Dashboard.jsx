@@ -539,6 +539,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                 {groupView === 'lifetime' ? (
                   <>
                     <th className="text-right px-2 py-2">Goal</th>
+                    <th className="text-right px-2 py-2">To Go</th>
                     <th className="text-right px-2 py-2">Lost</th>
                     <th className="text-right px-3 py-2">Prev</th>
                   </>
@@ -581,6 +582,13 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                     {groupView === 'lifetime' ? (
                       <>
                         <td className="text-right px-2 py-3 text-slate-400 tabular-nums">{s.goal?.toFixed(1) ?? '—'}</td>
+                        <td className="text-right px-2 py-3 font-medium tabular-nums">
+                          {s.goalHit ? (
+                            <span className="text-emerald-400">✓</span>
+                          ) : s.remaining != null ? (
+                            <span className="text-slate-200">{s.remaining.toFixed(1)}</span>
+                          ) : '—'}
+                        </td>
                         <td className={`text-right px-2 py-3 font-medium tabular-nums ${isGaining ? 'text-red-400' : 'text-emerald-400'}`}>
                           {isGaining ? '+' : '-'}{Math.abs(s.lost).toFixed(1)}
                         </td>
