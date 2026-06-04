@@ -1,3 +1,115 @@
+// Date after which non-retroactive badges become trackable. Streaks, %-based
+// loss, decade crossings, comeback events, etc. only count for logs on or
+// after this date — so people don't immediately unlock streak badges based
+// on competition-era history. Cumulative pound milestones and Onederland
+// remain lifetime-retroactive because they reflect total progress.
+export const BADGES_CUTOFF = '2026-05-22'
+
+function logsFromCutoff(stats) {
+  return (stats.logs ?? []).filter(l => l.date >= BADGES_CUTOFF)
+}
+
+// Best consecutive-day logging streak using only post-cutoff logs.
+function bestLogStreakSinceCutoff(stats) {
+  const dates = [...new Set(logsFromCutoff(stats).map(l => l.date))].sort()
+  if (dates.length === 0) return 0
+  let best = 1, run = 1
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1] + 'T00:00:00')
+    const curr = new Date(dates[i] + 'T00:00:00')
+    if (Math.round((curr - prev) / 86400000) === 1) { run++; if (run > best) best = run }
+    else run = 1
+  }
+  return best
+}
+
+// % body weight lost using post-cutoff baseline (first log on/after cutoff vs current).
+function pctLostSinceCutoff(stats) {
+  const logs = logsFromCutoff(stats).sort((a, b) => a.date.localeCompare(b.date))
+  if (logs.length < 2) return 0
+  const baseline = logs[0].weight
+  const current  = logs[logs.length - 1].weight
+  return baseline ? (baseline - current) / baseline : 0
+}
+
+// Best week-over-week loss streak using only post-cutoff logs.
+function bestWeeklyStreakSinceCutoff(stats) {
+  const logs = logsFromCutoff(stats)
+  if (logs.length === 0) return 0
+  const weekly = {}
+  for (const l of logs) {
+    const d = new Date(l.date + 'T00:00:00')
+    const dow = d.getDay()
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+    const ws = monday.toISOString().split('T')[0]
+    if (!weekly[ws]) weekly[ws] = { sum: 0, count: 0 }
+    weekly[ws].sum   += l.weight
+    weekly[ws].count++
+  }
+  const weeks = Object.keys(weekly).sort().map(k => weekly[k].sum / weekly[k].count)
+  let best = 0, run = 0
+  for (let i = 1; i < weeks.length; i++) {
+    if (weeks[i] <= weeks[i - 1]) { run++; if (run > best) best = run }
+    else run = 0
+  }
+  return best
+}
+
+function hadNewDecadeSinceCutoff(stats) {
+  const logs = logsFromCutoff(stats).sort((a, b) => a.date.localeCompare(b.date))
+  if (logs.length === 0) return false
+  const startDecade = Math.floor(logs[0].weight / 10)
+  return logs.some(l => Math.floor(l.weight / 10) < startDecade)
+}
+
+function hadComebackPRSinceCutoff(stats) {
+  const sorted = logsFromCutoff(stats).sort((a, b) => a.date.localeCompare(b.date))
+  let pr = Infinity
+  for (let i = 0; i < sorted.length; i++) {
+    const log = sorted[i]
+    if (log.weight < pr) {
+      const logDate = new Date(log.date + 'T00:00:00')
+      const fourteen = new Date(logDate); fourteen.setDate(fourteen.getDate() - 14)
+      const cutStr = fourteen.toISOString().split('T')[0]
+      const recent = sorted.slice(0, i).filter(l => l.date >= cutStr)
+      if (pr !== Infinity && recent.some(l => l.weight > pr + 0.5)) return true
+      pr = log.weight
+    }
+  }
+  return false
+}
+
+function hadPhoenixPRSinceCutoff(stats) {
+  const sorted = logsFromCutoff(stats).sort((a, b) => a.date.localeCompare(b.date))
+  let pr = Infinity
+  for (const log of sorted) {
+    if (log.weight < pr) {
+      if (pr !== Infinity && sorted.filter(l => l.date < log.date).some(l => l.weight >= log.weight + 3)) {
+        return true
+      }
+      pr = log.weight
+    }
+  }
+  return false
+}
+
+function hadMondayBeastSinceCutoff(stats) {
+  const mondays = logsFromCutoff(stats)
+    .filter(l => new Date(l.date + 'T00:00:00').getDay() === 1)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  let run = 1
+  for (let i = 1; i < mondays.length; i++) {
+    if (mondays[i].weight < mondays[i - 1].weight) {
+      run++
+      if (run >= 4) return true
+    } else {
+      run = 1
+    }
+  }
+  return false
+}
+
 // ── Helper functions for badge checks ──
 
 function daysSinceFirstLog(stats) {
@@ -234,23 +346,23 @@ export const BADGES = [
     check: s => s.weighIns >= 1 },
   { id: 'log-streak-7',   emoji: '🔥', name: '7-Day Streak',      category: 'consistency',
     description: 'Logged 7 days in a row',
-    check: s => s.bestLogStreak >= 7,
+    check: s => bestLogStreakSinceCutoff(s) >= 7,
     closeTo: nearLogStreak(7) },
   { id: 'log-streak-14',  emoji: '🔥', name: 'Two-Week Streak',   category: 'consistency',
     description: 'Logged 14 days in a row',
-    check: s => s.bestLogStreak >= 14,
+    check: s => bestLogStreakSinceCutoff(s) >= 14,
     closeTo: nearLogStreak(14) },
   { id: 'log-streak-30',  emoji: '🔥', name: 'Month Streak',      category: 'consistency',
     description: 'Logged 30 days in a row',
-    check: s => s.bestLogStreak >= 30,
+    check: s => bestLogStreakSinceCutoff(s) >= 30,
     closeTo: nearLogStreak(30) },
   { id: 'log-streak-60',  emoji: '💎', name: '60-Day Streak',     category: 'consistency',
     description: 'Logged 60 days in a row',
-    check: s => s.bestLogStreak >= 60,
+    check: s => bestLogStreakSinceCutoff(s) >= 60,
     closeTo: nearLogStreak(60) },
   { id: 'log-streak-100', emoji: '💎', name: 'Century Streak',    category: 'consistency',
     description: 'Logged 100 days in a row',
-    check: s => s.bestLogStreak >= 100,
+    check: s => bestLogStreakSinceCutoff(s) >= 100,
     closeTo: nearLogStreak(100) },
 
   // ── Weight loss milestones (5-lb increments) ──
@@ -267,34 +379,48 @@ export const BADGES = [
   { id: 'lost-30', emoji: '👑', name: '30+ lbs Down', category: 'progress',
     description: 'Total weight lost: 30+ lbs', check: s => (s.lost ?? 0) >= 30, closeTo: nearLbsLost(30) },
 
-  // ── Body-weight % (medical/health) ──
+  // ── Body-weight % (medical/health) — non-retroactive ──
   { id: 'pct-5',  emoji: '🩺', name: 'Doctor Approved', category: 'progress',
-    description: 'Lost 5% of body weight (clinically meaningful)',
-    check: s => (s.pctLost ?? 0) >= 0.05, closeTo: nearPctLost(0.05) },
+    description: 'Lost 5% of body weight (clinically meaningful) — earned going forward',
+    check: s => pctLostSinceCutoff(s) >= 0.05,
+    closeTo: s => {
+      const pct = pctLostSinceCutoff(s)
+      if (pct >= 0.05) return null
+      const remaining = 0.05 - pct
+      if (remaining > 0.01) return null
+      return `${(remaining * 100).toFixed(1)}% more body weight!`
+    } },
   { id: 'pct-10', emoji: '✨', name: '10% Down', category: 'progress',
-    description: 'Lost 10% of body weight',
-    check: s => (s.pctLost ?? 0) >= 0.10, closeTo: nearPctLost(0.10) },
+    description: 'Lost 10% of body weight — earned going forward',
+    check: s => pctLostSinceCutoff(s) >= 0.10,
+    closeTo: s => {
+      const pct = pctLostSinceCutoff(s)
+      if (pct >= 0.10) return null
+      const remaining = 0.10 - pct
+      if (remaining > 0.01) return null
+      return `${(remaining * 100).toFixed(1)}% more body weight!`
+    } },
 
-  // ── Onederland (only if start ≥ 200) ──
+  // ── Onederland (retroactive — start ≥ 200 and any log < 200) ──
   { id: 'onederland', emoji: '🎉', name: 'Onederland', category: 'progress',
     description: 'First log below 200 lbs',
     check: hadOnederland, closeTo: nearOnederland },
 
-  // ── New Decade — crossed into a lower 10-lb range ──
+  // ── New Decade — non-retroactive ──
   { id: 'new-decade', emoji: '📉', name: 'New Decade', category: 'progress',
-    description: 'Crossed into a lower 10-lb range',
-    check: hadNewDecade, closeTo: nearNewDecade },
+    description: 'Crossed into a lower 10-lb range — earned going forward',
+    check: hadNewDecadeSinceCutoff, closeTo: nearNewDecade },
 
-  // ── Weekly downtrend streaks ──
+  // ── Weekly downtrend streaks — non-retroactive ──
   { id: 'wave',    emoji: '🌊', name: 'Wave',    category: 'progress',
-    description: '4 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 4,  closeTo: nearWeeklyStreak(4) },
+    description: '4 consecutive weeks of weekly-avg loss — earned going forward',
+    check: s => bestWeeklyStreakSinceCutoff(s) >= 4,  closeTo: nearWeeklyStreak(4) },
   { id: 'tide',    emoji: '🌀', name: 'Tide',    category: 'progress',
-    description: '8 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 8,  closeTo: nearWeeklyStreak(8) },
+    description: '8 consecutive weeks of weekly-avg loss — earned going forward',
+    check: s => bestWeeklyStreakSinceCutoff(s) >= 8,  closeTo: nearWeeklyStreak(8) },
   { id: 'current', emoji: '⚡', name: 'Current', category: 'progress',
-    description: '12 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 12, closeTo: nearWeeklyStreak(12) },
+    description: '12 consecutive weeks of weekly-avg loss — earned going forward',
+    check: s => bestWeeklyStreakSinceCutoff(s) >= 12, closeTo: nearWeeklyStreak(12) },
 
   // ── Goal achievements ──
   // First Milestone fires if any configured milestone was hit, OR you've simply
@@ -331,21 +457,16 @@ export const BADGES = [
     check: s => (s.weighIns ?? 0) >= 100,
     closeTo: nearWeighIns(100) },
 
-  // ── Resilience ──
+  // ── Resilience — non-retroactive ──
   { id: 'comeback-kid', emoji: '🔄', name: 'Comeback Kid', category: 'resilience',
-    description: 'Hit a new PR within 14 days of a gain',
-    check: hadComebackPR },
+    description: 'Hit a new PR within 14 days of a gain — earned going forward',
+    check: hadComebackPRSinceCutoff },
   { id: 'phoenix',      emoji: '🦅', name: 'Phoenix',      category: 'resilience',
-    description: 'Came back from a 3+ lb gain to set a new PR',
-    check: hadPhoenixPR },
+    description: 'Came back from a 3+ lb gain to set a new PR — earned going forward',
+    check: hadPhoenixPRSinceCutoff },
   { id: 'monday-beast', emoji: '🌅', name: 'Monday Beast', category: 'resilience',
-    description: 'Lost weight 4 Mondays in a row',
-    check: hadMondayBeast },
-
-  // ── Quirky ──
-  { id: 'honest',  emoji: '🐷', name: 'Honest',  category: 'character',
-    description: 'Logged a weight gain (it happens, keep going)',
-    check: s => (s.logs ?? []).some((l, i, arr) => i > 0 && l.weight > arr[i - 1].weight) },
+    description: 'Lost weight 4 Mondays in a row — earned going forward',
+    check: hadMondayBeastSinceCutoff },
 ]
 
 // Returns the list of earned badge IDs for a participant's stats.

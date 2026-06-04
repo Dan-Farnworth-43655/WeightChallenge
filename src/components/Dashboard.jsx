@@ -410,7 +410,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const [editingGoals, setEditingGoals] = useState(false)
   const [unlockQueue, setUnlockQueue] = useState([])
 
-  // Detect newly earned badges for the active user and queue toasts
+  // Detect newly earned badges for the active user and queue toasts.
+  // Also drops badges from "seen" that are no longer earned, so if criteria
+  // ever changes and the badge re-earns later, it triggers a fresh toast.
   useEffect(() => {
     if (!activeUser) return
     const me = allStats.find(s => s.participant.id === activeUser)
@@ -423,8 +425,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
     if (newly.length > 0) {
       const newBadges = newly.map(id => BADGES.find(b => b.id === id)).filter(Boolean)
       setUnlockQueue(newBadges)
-      try { localStorage.setItem(key, JSON.stringify(earned)) } catch (e) {}
     }
+    // Persist exactly what's currently earned — drops stale "seen" entries
+    try { localStorage.setItem(key, JSON.stringify(earned)) } catch (e) {}
   }, [activeUser, allStats])
 
   const dismissUnlock = () => setUnlockQueue(q => q.slice(1))

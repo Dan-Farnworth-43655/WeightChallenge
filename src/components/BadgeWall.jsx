@@ -8,7 +8,6 @@ const CATEGORY_LABELS = {
   goals:       'Goals',
   commitment:  'Commitment',
   resilience:  'Resilience',
-  character:   'Character',
 }
 
 // Group-wide badge gallery. Each badge shows who has earned it via small
