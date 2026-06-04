@@ -3,7 +3,7 @@
 // after this date — so people don't immediately unlock streak badges based
 // on competition-era history. Cumulative pound milestones and Onederland
 // remain lifetime-retroactive because they reflect total progress.
-export const BADGES_CUTOFF = '2026-05-22'
+export const BADGES_CUTOFF = '2026-06-03'
 
 function logsFromCutoff(stats) {
   return (stats.logs ?? []).filter(l => l.date >= BADGES_CUTOFF)
@@ -423,12 +423,9 @@ export const BADGES = [
     check: s => bestWeeklyStreakSinceCutoff(s) >= 12, closeTo: nearWeeklyStreak(12) },
 
   // ── Goal achievements ──
-  // First Milestone fires if any configured milestone was hit, OR you've simply
-  // lost 5+ lbs total — recognizing real progress for anyone who hasn't set
-  // milestones yet or who hit informal ones before this tracker existed.
   { id: 'first-milestone', emoji: '🥉', name: 'First Milestone', category: 'goals',
-    description: 'Hit your first milestone (or 5+ lbs lost)',
-    check: s => (s.milestones ?? []).some(m => m.hit) || (s.lost ?? 0) >= 5 },
+    description: 'Hit your first configured milestone weight',
+    check: s => (s.milestones ?? []).some(m => m.hit) },
   { id: 'all-milestones',  emoji: '🥈', name: 'All Milestones',  category: 'goals',
     description: 'Hit every milestone',
     check: s => (s.milestones ?? []).length > 0 && (s.milestones ?? []).every(m => m.hit) },
