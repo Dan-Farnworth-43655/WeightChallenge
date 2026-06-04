@@ -572,11 +572,23 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                 return (
                   <tr
                     key={s.participant.id}
-                    className={`border-t border-slate-800 ${missingToday ? 'outline outline-1 outline-red-500/40 bg-red-500/5' : ''}`}
-                    title={missingToday ? (s.daysSinceLastLog > 1 ? `Hasn't logged in ${s.daysSinceLastLog} days` : "Hasn't logged today") : undefined}
+                    className={`border-t border-slate-800 transition-opacity ${missingToday ? 'opacity-60' : ''}`}
+                    title={
+                      missingToday
+                        ? (s.daysSinceLastLog > 1 ? `Hasn't logged in ${s.daysSinceLastLog} days` : "Hasn't logged today")
+                        : 'Logged today ✓'
+                    }
                   >
                     <td className="px-3 py-3">
-                      <span className="font-bold" style={{ color: s.participant.color }}>{s.participant.initials}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            loggedToday ? 'bg-emerald-400' : 'bg-slate-600'
+                          }`}
+                          aria-label={loggedToday ? 'logged today' : 'not logged today'}
+                        />
+                        <span className="font-bold" style={{ color: s.participant.color }}>{s.participant.initials}</span>
+                      </div>
                     </td>
                     <td className="text-right px-2 py-3 text-slate-300 tabular-nums">{s.current?.toFixed(1) ?? '—'}</td>
                     {groupView === 'lifetime' ? (
