@@ -7,12 +7,19 @@ export default function Calendar({ participant, stats }) {
   today.setHours(0, 0, 0, 0)
   const [viewMonth, setViewMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
 
-  // Build lookup of logged weights by date string
+  // Build lookup of logged weight + delta-vs-previous by date.
+  // delta is positive = gained, negative = lost, 0 = flat. null = first log (no prior).
+  const sortedLogs = [...(stats?.logs ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   const loggedByDate = {}
-  for (const log of stats?.logs ?? []) loggedByDate[log.date] = log.weight
+  for (let i = 0; i < sortedLogs.length; i++) {
+    const log = sortedLogs[i]
+    const prev = i > 0 ? sortedLogs[i - 1] : null
+    const delta = prev ? log.weight - prev.weight : null
+    loggedByDate[log.date] = { weight: log.weight, delta }
+  }
 
   // First log date — anything before this is "pre-start", dimmed not punished
-  const firstLogDate = (stats?.logs?.length ?? 0) > 0 ? stats.logs[0].date : null
+  const firstLogDate = sortedLogs.length > 0 ? sortedLogs[0].date : null
 
   const year  = viewMonth.getFullYear()
   const month = viewMonth.getMonth()
@@ -30,13 +37,15 @@ export default function Calendar({ participant, stats }) {
     const dateStr = `${year}-${monthStr}-${dd}`
     const dt = new Date(year, month, d)
     dt.setHours(0, 0, 0, 0)
+    const entry = loggedByDate[dateStr]
     cells.push({
       day: d,
       dateStr,
       isToday:       dt.getTime() === today.getTime(),
       isFuture:      dt.getTime() > today.getTime(),
       isBeforeFirst: !!firstLogDate && dateStr < firstLogDate,
-      weight:        loggedByDate[dateStr],
+      weight:        entry?.weight ?? null,
+      delta:         entry?.delta ?? null,
     })
   }
 
@@ -110,20 +119,36 @@ export default function Calendar({ participant, stats }) {
               </div>
             )
           }
-          // Logged day: colored fill + weight
+          // Logged day: colored by delta vs previous log (green = lost, red = gained, neutral = flat / first log)
           if (c.weight != null) {
+            const lost     = c.delta != null && c.delta < 0
+            const gained   = c.delta != null && c.delta > 0
+            const flat     = c.delta != null && c.delta === 0
+            const baseline = c.delta == null // first ever log
+            // Tailwind colors:
+            //   emerald = lost / first log baseline (neutral-positive)
+            //   red     = gained
+            //   slate   = exactly flat
+            const cls = gained
+              ? 'bg-red-500/25 border-red-500/70 text-red-200'
+              : lost
+                ? 'bg-emerald-500/25 border-emerald-500/70 text-emerald-200'
+                : flat
+                  ? 'bg-slate-700/40 border-slate-500/70 text-slate-200'
+                  : 'bg-sky-500/20 border-sky-400/60 text-sky-200' // baseline / first log
+            const deltaLabel = c.delta == null
+              ? 'first log'
+              : c.delta === 0
+                ? 'flat'
+                : `${c.delta > 0 ? '+' : ''}${c.delta.toFixed(1)}`
             return (
               <div
                 key={i}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center border ${c.isToday ? 'ring-2 ring-white' : ''}`}
-                style={{
-                  backgroundColor: participant.color + '33',
-                  borderColor: participant.color + '88',
-                }}
-                title={`${c.dateStr}: ${c.weight} lbs`}
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center border ${cls} ${c.isToday ? 'ring-2 ring-white' : ''}`}
+                title={`${c.dateStr}: ${c.weight} lbs (${deltaLabel})`}
               >
-                <span className="text-[11px] font-bold leading-none" style={{ color: participant.color }}>{c.day}</span>
-                <span className="text-[9px] tabular-nums mt-0.5" style={{ color: participant.color }}>{c.weight}</span>
+                <span className="text-[11px] font-bold leading-none">{c.day}</span>
+                <span className="text-[9px] tabular-nums mt-0.5">{c.weight}</span>
               </div>
             )
           }
@@ -141,10 +166,18 @@ export default function Calendar({ participant, stats }) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 text-[10px] text-slate-500 pt-1">
+      <div className="flex items-center justify-center gap-3 text-[10px] text-slate-500 pt-1 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded border" style={{ backgroundColor: participant.color + '33', borderColor: participant.color + '88' }} />
-          <span>Logged</span>
+          <div className="w-3 h-3 rounded bg-emerald-500/25 border border-emerald-500/70" />
+          <span>Lost</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-red-500/25 border border-red-500/70" />
+          <span>Gained</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-slate-700/40 border border-slate-500/70" />
+          <span>Flat</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-slate-900 border border-red-500/20" />
