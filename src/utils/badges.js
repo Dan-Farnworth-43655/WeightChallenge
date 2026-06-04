@@ -1,3 +1,100 @@
+// ── Helper functions for badge checks ──
+
+function daysSinceFirstLog(stats) {
+  if (!stats.logs?.length) return 0
+  const first = new Date(stats.logs[0].date + 'T00:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return Math.floor((today - first) / 86400000)
+}
+
+// True if any new-PR log was preceded (within 14 days) by a log that gained
+// at least 0.5 lbs above the prior PR — they bounced back fast.
+function hadComebackPR(stats) {
+  const sorted = [...(stats.logs ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+  let pr = Infinity
+  for (let i = 0; i < sorted.length; i++) {
+    const log = sorted[i]
+    if (log.weight < pr) {
+      const logDate = new Date(log.date + 'T00:00:00')
+      const cutoff  = new Date(logDate); cutoff.setDate(cutoff.getDate() - 14)
+      const cutStr  = cutoff.toISOString().split('T')[0]
+      const recent  = sorted.slice(0, i).filter(l => l.date >= cutStr)
+      if (recent.some(l => l.weight > pr + 0.5)) return true
+      pr = log.weight
+    }
+  }
+  return false
+}
+
+// True if any new-PR log was preceded at some point by a log 3+ lbs above
+// the eventual PR (a real setback they came back from).
+function hadPhoenixPR(stats) {
+  const sorted = [...(stats.logs ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+  let pr = Infinity
+  for (const log of sorted) {
+    if (log.weight < pr) {
+      // Did any earlier log gain 3+ above the prior PR? (use current weight as floor of comparison)
+      if (sorted.filter(l => l.date < log.date).some(l => l.weight >= log.weight + 3)) {
+        // And was the prior PR not also already this low? (avoids triggering on first log)
+        if (pr !== Infinity) return true
+      }
+      pr = log.weight
+    }
+  }
+  return false
+}
+
+// True if 4+ consecutive Monday logs each weighed less than the previous Monday's log.
+function hadMondayBeast(stats) {
+  const mondays = (stats.logs ?? [])
+    .filter(l => new Date(l.date + 'T00:00:00').getDay() === 1)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  let run = 1
+  for (let i = 1; i < mondays.length; i++) {
+    if (mondays[i].weight < mondays[i - 1].weight) {
+      run++
+      if (run >= 4) return true
+    } else {
+      run = 1
+    }
+  }
+  return false
+}
+
+// True if there was a stretch of 14+ days where every log was at least 1 lb
+// below the participant's goal weight (sustained maintenance / overshoot).
+function hadSustainedPastGoal(stats) {
+  if (stats.goal == null) return false
+  const threshold = stats.goal - 1
+  const sorted = [...(stats.logs ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+  let runStart = null
+  let lastBelow = null
+  for (const log of sorted) {
+    if (log.weight <= threshold) {
+      if (runStart == null) runStart = log.date
+      lastBelow = log.date
+    } else {
+      if (runStart && lastBelow) {
+        const days = (new Date(lastBelow) - new Date(runStart)) / 86400000
+        if (days >= 14) return true
+      }
+      runStart = null
+      lastBelow = null
+    }
+  }
+  if (runStart && lastBelow) {
+    const days = (new Date(lastBelow) - new Date(runStart)) / 86400000
+    if (days >= 14) return true
+  }
+  return false
+}
+
+// Onederland: only relevant if their starting weight was 200+ AND they have a log under 200.
+function hadOnederland(stats) {
+  if (!stats.effectiveStart || stats.effectiveStart < 200) return false
+  return (stats.logs ?? []).some(l => l.weight < 200)
+}
+
 // All achievement badges. `check(stats)` returns true if the participant has earned it.
 // Order matters — displayed in this order on the wall.
 export const BADGES = [
@@ -35,16 +132,57 @@ export const BADGES = [
   { id: 'lost-30', emoji: '👑', name: '30+ lbs Down', category: 'progress',
     description: 'Total weight lost: 30+ lbs', check: s => (s.lost ?? 0) >= 30 },
 
+  // ── Body-weight % (medical/health) ──
+  { id: 'pct-5',  emoji: '🩺', name: 'Doctor Approved', category: 'progress',
+    description: 'Lost 5% of body weight (clinically meaningful)',
+    check: s => (s.pctLost ?? 0) >= 0.05 },
+  { id: 'pct-10', emoji: '✨', name: '10% Down', category: 'progress',
+    description: 'Lost 10% of body weight',
+    check: s => (s.pctLost ?? 0) >= 0.10 },
+
+  // ── Onederland (only if start ≥ 200) ──
+  { id: 'onederland', emoji: '🎉', name: 'Onederland', category: 'progress',
+    description: 'First log below 200 lbs',
+    check: hadOnederland },
+
   // ── Goal achievements ──
+  // First Milestone fires if any configured milestone was hit, OR you've simply
+  // lost 5+ lbs total — recognizing real progress for anyone who hasn't set
+  // milestones yet or who hit informal ones before this tracker existed.
   { id: 'first-milestone', emoji: '🥉', name: 'First Milestone', category: 'goals',
-    description: 'Hit your first milestone weight',
-    check: s => (s.milestones ?? []).some(m => m.hit) },
+    description: 'Hit your first milestone (or 5+ lbs lost)',
+    check: s => (s.milestones ?? []).some(m => m.hit) || (s.lost ?? 0) >= 5 },
   { id: 'all-milestones',  emoji: '🥈', name: 'All Milestones',  category: 'goals',
     description: 'Hit every milestone',
     check: s => (s.milestones ?? []).length > 0 && (s.milestones ?? []).every(m => m.hit) },
   { id: 'goal-hit',        emoji: '🥇', name: 'Goal Crushed',    category: 'goals',
     description: 'Hit your final goal weight',
     check: s => !!s.goalHit },
+  { id: 'past-goal',       emoji: '🚀', name: 'Past Goal',       category: 'goals',
+    description: '14+ days sustained 1+ lb below your goal',
+    check: hadSustainedPastGoal },
+
+  // ── Commitment / time tracking ──
+  { id: 'month-one', emoji: '📅', name: 'Month One', category: 'commitment',
+    description: '30 days since your first log',
+    check: s => daysSinceFirstLog(s) >= 30 },
+  { id: 'the-og',    emoji: '🏛️', name: 'The OG',   category: 'commitment',
+    description: '1 year tracking anniversary',
+    check: s => daysSinceFirstLog(s) >= 365 },
+  { id: 'hundred-club', emoji: '📒', name: 'Hundred Club', category: 'commitment',
+    description: '100 total weigh-ins logged',
+    check: s => (s.weighIns ?? 0) >= 100 },
+
+  // ── Resilience ──
+  { id: 'comeback-kid', emoji: '🔄', name: 'Comeback Kid', category: 'resilience',
+    description: 'Hit a new PR within 14 days of a gain',
+    check: hadComebackPR },
+  { id: 'phoenix',      emoji: '🦅', name: 'Phoenix',      category: 'resilience',
+    description: 'Came back from a 3+ lb gain to set a new PR',
+    check: hadPhoenixPR },
+  { id: 'monday-beast', emoji: '🌅', name: 'Monday Beast', category: 'resilience',
+    description: 'Lost weight 4 Mondays in a row',
+    check: hadMondayBeast },
 
   // ── Quirky ──
   { id: 'honest',  emoji: '🐷', name: 'Honest',  category: 'character',

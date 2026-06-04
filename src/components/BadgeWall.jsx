@@ -4,6 +4,8 @@ const CATEGORY_LABELS = {
   consistency: 'Consistency',
   progress:    'Progress',
   goals:       'Goals',
+  commitment:  'Commitment',
+  resilience:  'Resilience',
   character:   'Character',
 }
 
