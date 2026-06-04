@@ -76,52 +76,101 @@ export default function App() {
   return (
     <div className="flex flex-col min-h-screen max-w-2xl mx-auto">
       <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold leading-tight">Accountability Tracker</h1>
-            {myStats?.current != null ? (
-              <p className="text-xs text-slate-400 truncate">
-                <span className="text-slate-200 font-semibold tabular-nums">{myStats.current.toFixed(1)} lbs</span>
-                {myStats.nextMilestone && !myStats.goalHit ? (
-                  <>
-                    {' '}·{' '}
-                    <span className="text-slate-300">
-                      {Math.max(0, myStats.current - myStats.nextMilestone.weight).toFixed(1)}
-                    </span>
-                    {' '}to {myStats.nextMilestone.weight}
-                  </>
-                ) : myStats.goal != null && !myStats.goalHit ? (
-                  <>
-                    {' '}·{' '}
-                    <span className="text-slate-300">
-                      {Math.max(0, myStats.current - myStats.goal).toFixed(1)}
-                    </span>
-                    {' '}to goal 🎯
-                  </>
-                ) : myStats.goalHit ? (
-                  <> · <span className="text-emerald-400 font-semibold">✓ At goal</span></>
-                ) : null}
-              </p>
-            ) : (
-              <p className="text-xs text-slate-400">One day at a time</p>
-            )}
-          </div>
+        {/* Top row: small title + sign-out */}
+        <div className="flex items-center justify-between mb-2.5">
+          <h1 className="text-[11px] uppercase tracking-[0.2em] font-bold text-slate-500">Accountability Tracker</h1>
           <button
             onClick={() => setActiveUser(null)}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors shrink-0 ml-3"
+            className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-wider"
           >
-            <span
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-              style={{ backgroundColor: activeParticipant?.color }}
-            >
-              {activeParticipant?.initials}
-            </span>
-            <span>{activeParticipant?.name}</span>
+            Switch user
           </button>
         </div>
-        <div className="text-center mt-2">
+
+        {/* Main row: avatar with progress ring + weight + streaks */}
+        <div className="flex items-center gap-3">
+          {/* Avatar with conic-gradient progress ring */}
+          <div
+            className="w-12 h-12 rounded-full shrink-0 relative"
+            style={{
+              background: activeParticipant
+                ? `conic-gradient(${activeParticipant.color} 0deg ${Math.max(0, Math.min(1, myStats?.pctToGoal ?? 0)) * 360}deg, ${activeParticipant.color}22 0deg)`
+                : '#1e293b',
+            }}
+            title={`${Math.round((myStats?.pctToGoal ?? 0) * 100)}% to goal`}
+          >
+            <div
+              className="absolute inset-[3px] rounded-full bg-slate-950 flex items-center justify-center text-xs font-black"
+              style={{ color: activeParticipant?.color }}
+            >
+              {activeParticipant?.initials}
+            </div>
+          </div>
+
+          {/* Weight + status */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              {myStats?.current != null ? (
+                <span className="text-2xl font-black tabular-nums leading-none">{myStats.current.toFixed(1)}</span>
+              ) : (
+                <span className="text-2xl font-black text-slate-600 leading-none">—</span>
+              )}
+              <span className="text-xs text-slate-500">lbs</span>
+              <span className="ml-1 text-xs text-slate-400 truncate">· {activeParticipant?.name}</span>
+            </div>
+            <div className="text-[11px] text-slate-400 truncate mt-1 leading-tight">
+              {myStats?.goalHit ? (
+                <span className="text-emerald-400 font-semibold">✓ At goal</span>
+              ) : myStats?.nextMilestone ? (
+                <>
+                  <span className="text-slate-300 font-semibold tabular-nums">
+                    {Math.max(0, myStats.current - myStats.nextMilestone.weight).toFixed(1)}
+                  </span> to{' '}
+                  <span className="font-semibold" style={{ color: activeParticipant?.color }}>
+                    {myStats.nextMilestone.weight}
+                  </span>
+                </>
+              ) : myStats?.goal != null ? (
+                <>
+                  <span className="text-slate-300 font-semibold tabular-nums">
+                    {Math.max(0, myStats.current - myStats.goal).toFixed(1)}
+                  </span> to goal 🎯
+                </>
+              ) : (
+                <span>One day at a time</span>
+              )}
+            </div>
+          </div>
+
+          {/* Streak badges */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {myStats?.logStreak >= 2 && (
+              <span
+                className={`text-[10px] font-bold rounded-full px-2 py-0.5 border whitespace-nowrap ${
+                  myStats.logStreakAtRisk
+                    ? 'text-amber-300 bg-amber-500/10 border-amber-500/40'
+                    : 'text-sky-300 bg-sky-500/10 border-sky-500/30'
+                }`}
+                title={myStats.logStreakAtRisk ? 'Log today to save your streak!' : 'Consecutive days logged'}
+              >
+                🗓️ {myStats.logStreak}d
+              </span>
+            )}
+            {myStats?.streak >= 2 && (
+              <span
+                className="text-[10px] font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5 whitespace-nowrap"
+                title={`${myStats.streak}-week downtrend`}
+              >
+                🔥 {myStats.streak}w
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Verse footer */}
+        <div className="text-center mt-3 pt-2 border-t border-slate-800/60">
           <p className="text-xs text-slate-500 whitespace-nowrap">⚔️ 🛡️ &nbsp;As iron sharpens iron, so one man sharpens another&nbsp; 🛡️ ⚔️</p>
-          <p className="text-xs text-slate-600">Proverbs 27:17</p>
+          <p className="text-[10px] text-slate-600">Proverbs 27:17</p>
         </div>
       </header>
 

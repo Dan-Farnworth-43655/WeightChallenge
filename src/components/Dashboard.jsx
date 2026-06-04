@@ -409,6 +409,14 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const today = todayStr()
   const [editingGoals, setEditingGoals] = useState(false)
   const [unlockQueue, setUnlockQueue] = useState([])
+  // 'lifetime' | 'next' — group progress table view
+  const [groupView, setGroupView] = useState(() => {
+    try { return localStorage.getItem('groupView') || 'lifetime' } catch (e) { return 'lifetime' }
+  })
+  const switchGroupView = (v) => {
+    setGroupView(v)
+    try { localStorage.setItem('groupView', v) } catch (e) {}
+  }
 
   // Detect newly earned badges for the active user and queue toasts.
   // Also drops badges from "seen" that are no longer earned, so if criteria
@@ -501,19 +509,46 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
       {/* Group progress table — top of the dashboard, the accountability anchor */}
       {hasData && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-800">
+          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
             <h2 className="font-semibold text-sm text-slate-300">Group Progress</h2>
+            {/* Lifetime / Next Up toggle pill */}
+            <div className="bg-slate-800 rounded-full p-0.5 flex text-[10px] uppercase tracking-wider font-bold">
+              <button
+                onClick={() => switchGroupView('lifetime')}
+                className={`px-2.5 py-1 rounded-full transition-colors ${
+                  groupView === 'lifetime' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Lifetime
+              </button>
+              <button
+                onClick={() => switchGroupView('next')}
+                className={`px-2.5 py-1 rounded-full transition-colors ${
+                  groupView === 'next' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Next Up
+              </button>
+            </div>
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-slate-500 uppercase">
                 <th className="text-left px-3 py-2">Name</th>
                 <th className="text-right px-2 py-2">Cur</th>
-                <th className="text-right px-2 py-2">Goal</th>
-                <th className="text-right px-2 py-2">Lost</th>
-                <th className="text-right px-2 py-2">% Lost</th>
-                <th className="text-right px-2 py-2">Prev</th>
-                <th className="text-right px-3 py-2">Prev %</th>
+                {groupView === 'lifetime' ? (
+                  <>
+                    <th className="text-right px-2 py-2">Goal</th>
+                    <th className="text-right px-2 py-2">Lost</th>
+                    <th className="text-right px-3 py-2">Prev</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="text-right px-2 py-2">→ Next</th>
+                    <th className="text-right px-2 py-2">Days</th>
+                    <th className="text-right px-3 py-2">Prev</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -521,9 +556,18 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                 const isGaining = s.lost < 0
                 const prevLog = s.logs.length >= 2 ? s.logs[s.logs.length - 2] : null
                 const prevDelta = prevLog ? s.current - prevLog.weight : null
-                const prevPct   = prevLog ? (prevLog.weight - s.current) / prevLog.weight * 100 : null
                 const loggedToday = s.logs.some(l => l.date === today)
                 const missingToday = s.logs.length > 0 && !loggedToday
+                // Next-target derivation: next un-hit milestone, or final goal as fallback
+                const nextTarget = s.nextMilestone
+                  ? { weight: s.nextMilestone.weight, date: s.nextMilestone.date, isGoal: false }
+                  : (s.goal != null ? { weight: s.goal, date: s.goalDate, isGoal: true } : null)
+                const lbsToNext = nextTarget && s.current != null
+                  ? Math.max(0, s.current - nextTarget.weight)
+                  : null
+                const daysToNext = nextTarget?.date
+                  ? Math.max(0, Math.ceil((nextTarget.date - new Date()) / 86400000))
+                  : null
                 return (
                   <tr
                     key={s.participant.id}
@@ -534,19 +578,38 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                       <span className="font-bold" style={{ color: s.participant.color }}>{s.participant.initials}</span>
                     </td>
                     <td className="text-right px-2 py-3 text-slate-300 tabular-nums">{s.current?.toFixed(1) ?? '—'}</td>
-                    <td className="text-right px-2 py-3 text-slate-400 tabular-nums">{s.goal?.toFixed(1) ?? '—'}</td>
-                    <td className={`text-right px-2 py-3 font-medium tabular-nums ${isGaining ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {isGaining ? '+' : '-'}{Math.abs(s.lost).toFixed(1)}
-                    </td>
-                    <td className={`text-right px-2 py-3 font-bold tabular-nums ${isGaining ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {isGaining ? '+' : ''}{(s.pctLost * 100).toFixed(2)}%
-                    </td>
-                    <td className={`text-right px-2 py-3 text-xs tabular-nums ${prevDelta === null ? 'text-slate-600' : prevDelta > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {prevDelta === null ? '—' : `${prevDelta > 0 ? '+' : ''}${prevDelta.toFixed(1)}`}
-                    </td>
-                    <td className={`text-right px-3 py-3 text-xs tabular-nums ${prevPct === null ? 'text-slate-600' : prevPct < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {prevPct === null ? '—' : `${prevPct > 0 ? '+' : ''}${prevPct.toFixed(2)}%`}
-                    </td>
+                    {groupView === 'lifetime' ? (
+                      <>
+                        <td className="text-right px-2 py-3 text-slate-400 tabular-nums">{s.goal?.toFixed(1) ?? '—'}</td>
+                        <td className={`text-right px-2 py-3 font-medium tabular-nums ${isGaining ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {isGaining ? '+' : '-'}{Math.abs(s.lost).toFixed(1)}
+                        </td>
+                        <td className={`text-right px-3 py-3 text-xs tabular-nums ${prevDelta === null ? 'text-slate-600' : prevDelta > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {prevDelta === null ? '—' : `${prevDelta > 0 ? '+' : ''}${prevDelta.toFixed(1)}`}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="text-right px-2 py-3 tabular-nums">
+                          {s.goalHit ? (
+                            <span className="text-emerald-400 font-bold">✓</span>
+                          ) : lbsToNext != null && nextTarget ? (
+                            <span>
+                              <span className="font-medium">{lbsToNext.toFixed(1)}</span>
+                              <span className={`text-[10px] ml-1 ${nextTarget.isGoal ? 'text-amber-400/80' : 'text-slate-500'}`}>
+                                →{nextTarget.weight}{nextTarget.isGoal ? '🎯' : ''}
+                              </span>
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="text-right px-2 py-3 text-slate-400 tabular-nums">
+                          {daysToNext != null ? `${daysToNext}d` : '—'}
+                        </td>
+                        <td className={`text-right px-3 py-3 text-xs tabular-nums ${prevDelta === null ? 'text-slate-600' : prevDelta > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {prevDelta === null ? '—' : `${prevDelta > 0 ? '+' : ''}${prevDelta.toFixed(1)}`}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 )
               })}
