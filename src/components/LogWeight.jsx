@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import confetti from 'canvas-confetti'
-import { formatDate } from '../utils/calculations'
+import { formatDate, computeStats } from '../utils/calculations'
+import { nearestUnearnedBadge } from '../utils/badges'
+import AlmostThereModal from './AlmostThereModal'
 import { deleteLog, postLog } from '../api'
 
 const DANCING_GIFS = [
@@ -146,6 +148,7 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
   const [editWeight, setEditWeight] = useState('')
   const [deletingDate, setDeletingDate] = useState(null)
   const [modalQueue, setModalQueue] = useState([]) // ordered list of modals to show
+  const [almostThere, setAlmostThere] = useState(null) // { badge, message } for AlmostThereModal
   const [historyExpanded, setHistoryExpanded] = useState(false)
 
   const todayEntry = stats?.logs?.find(l => l.date === date)
@@ -206,6 +209,19 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
 
     if (gainedWeight && !hitMilestone && !hitGoal) queue.push('gain')
 
+    // Almost-there detection: compute what stats WILL be after this log lands,
+    // then see if they're close to any unearned badge. Show last (lowest priority).
+    const updatedLogs = [
+      ...(stats?.logs ?? []).filter(l => l.date !== date),
+      { participant: participant.id, date, weight: w },
+    ]
+    const newStats   = computeStats(participant, updatedLogs)
+    const nearMiss   = nearestUnearnedBadge(newStats)
+    if (nearMiss) {
+      setAlmostThere(nearMiss)
+      queue.push('almost')
+    }
+
     if (queue.length > 0) setModalQueue(queue)
 
     setTimeout(() => setSaved(false), 2500)
@@ -243,6 +259,14 @@ export default function LogWeight({ participant, stats, onLog, onRefresh, todayS
           participant={participant}
           milestoneWeight={parseFloat(modalQueue[0].split('-')[1])}
           onClose={dismissModal}
+        />
+      )}
+      {modalQueue[0] === 'almost' && almostThere && (
+        <AlmostThereModal
+          badge={almostThere.badge}
+          message={almostThere.message}
+          participant={participant}
+          onClose={() => { setAlmostThere(null); dismissModal() }}
         />
       )}
 

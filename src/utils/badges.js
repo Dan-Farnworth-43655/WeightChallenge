@@ -134,6 +134,97 @@ function bestWeeklyStreakEver(stats) {
   return Math.max(stats.streak ?? 0, stats.prevBestStreak ?? 0)
 }
 
+// Returns a near-miss message if you're close to a lbs-lost threshold (within 1 lb).
+function nearLbsLost(threshold) {
+  return s => {
+    const lost = s.lost ?? 0
+    if (lost >= threshold) return null
+    const remaining = threshold - lost
+    if (remaining > 1) return null
+    return `Just ${remaining.toFixed(1)} lbs to go!`
+  }
+}
+
+function nearPctLost(threshold) {
+  return s => {
+    const pct = s.pctLost ?? 0
+    if (pct >= threshold) return null
+    const remaining = threshold - pct
+    if (remaining > 0.01) return null
+    return `${(remaining * 100).toFixed(1)}% more body weight!`
+  }
+}
+
+function nearLogStreak(target) {
+  return s => {
+    const cur = s.logStreak ?? 0
+    if (cur >= target) return null
+    const left = target - cur
+    if (left > 2) return null
+    return left === 1 ? 'Log tomorrow to unlock!' : `Only ${left} more days!`
+  }
+}
+
+function nearWeeklyStreak(target) {
+  return s => {
+    const cur = bestWeeklyStreakEver(s)
+    if (cur >= target) return null
+    const left = target - cur
+    if (left > 1) return null
+    return 'One more week of weekly-avg loss!'
+  }
+}
+
+function nearWeighIns(target) {
+  return s => {
+    const cur = s.weighIns ?? 0
+    if (cur >= target) return null
+    const left = target - cur
+    if (left > 5) return null
+    return `Only ${left} more logs!`
+  }
+}
+
+function nearDaysTracking(target) {
+  return s => {
+    if (!s.logs?.length) return null
+    const first = new Date(s.logs[0].date + 'T00:00:00')
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const days = Math.floor((today - first) / 86400000)
+    if (days >= target) return null
+    const left = target - days
+    if (left > 7) return null
+    return `${left} ${left === 1 ? 'day' : 'days'} away!`
+  }
+}
+
+function nearOnederland(s) {
+  if (!s.effectiveStart || s.effectiveStart < 200) return null
+  if (s.current == null || s.current < 200) return null
+  const remaining = s.current - 199.9
+  if (remaining > 3) return null
+  return `${remaining.toFixed(1)} lbs from the 100s!`
+}
+
+function nearNewDecade(s) {
+  if (!s.effectiveStart || s.current == null) return null
+  const startDecade   = Math.floor(s.effectiveStart / 10)
+  const currentDecade = Math.floor(s.current / 10)
+  if (currentDecade < startDecade) return null // already crossed at least once
+  // distance to dropping below the next decade boundary (current decade floor)
+  const nextThreshold = currentDecade * 10
+  const remaining = s.current - (nextThreshold - 0.1)
+  if (remaining > 2) return null
+  return `${remaining.toFixed(1)} lbs to drop into the ${nextThreshold - 10}s!`
+}
+
+function nearGoalHit(s) {
+  if (s.goalHit || s.goal == null || s.current == null) return null
+  const remaining = s.current - s.goal
+  if (remaining <= 0 || remaining > 2) return null
+  return `${remaining.toFixed(1)} lbs from your goal!`
+}
+
 // All achievement badges. `check(stats)` returns true if the participant has earned it.
 // Order matters — displayed in this order on the wall.
 export const BADGES = [
@@ -143,62 +234,67 @@ export const BADGES = [
     check: s => s.weighIns >= 1 },
   { id: 'log-streak-7',   emoji: '🔥', name: '7-Day Streak',      category: 'consistency',
     description: 'Logged 7 days in a row',
-    check: s => s.bestLogStreak >= 7 },
+    check: s => s.bestLogStreak >= 7,
+    closeTo: nearLogStreak(7) },
   { id: 'log-streak-14',  emoji: '🔥', name: 'Two-Week Streak',   category: 'consistency',
     description: 'Logged 14 days in a row',
-    check: s => s.bestLogStreak >= 14 },
+    check: s => s.bestLogStreak >= 14,
+    closeTo: nearLogStreak(14) },
   { id: 'log-streak-30',  emoji: '🔥', name: 'Month Streak',      category: 'consistency',
     description: 'Logged 30 days in a row',
-    check: s => s.bestLogStreak >= 30 },
+    check: s => s.bestLogStreak >= 30,
+    closeTo: nearLogStreak(30) },
   { id: 'log-streak-60',  emoji: '💎', name: '60-Day Streak',     category: 'consistency',
     description: 'Logged 60 days in a row',
-    check: s => s.bestLogStreak >= 60 },
+    check: s => s.bestLogStreak >= 60,
+    closeTo: nearLogStreak(60) },
   { id: 'log-streak-100', emoji: '💎', name: 'Century Streak',    category: 'consistency',
     description: 'Logged 100 days in a row',
-    check: s => s.bestLogStreak >= 100 },
+    check: s => s.bestLogStreak >= 100,
+    closeTo: nearLogStreak(100) },
 
   // ── Weight loss milestones (5-lb increments) ──
   { id: 'lost-5',  emoji: '⭐', name: '5 lbs Down',  category: 'progress',
-    description: 'Total weight lost: 5 lbs',  check: s => (s.lost ?? 0) >= 5 },
+    description: 'Total weight lost: 5 lbs',  check: s => (s.lost ?? 0) >= 5,  closeTo: nearLbsLost(5) },
   { id: 'lost-10', emoji: '⭐', name: '10 lbs Down', category: 'progress',
-    description: 'Total weight lost: 10 lbs', check: s => (s.lost ?? 0) >= 10 },
+    description: 'Total weight lost: 10 lbs', check: s => (s.lost ?? 0) >= 10, closeTo: nearLbsLost(10) },
   { id: 'lost-15', emoji: '⭐', name: '15 lbs Down', category: 'progress',
-    description: 'Total weight lost: 15 lbs', check: s => (s.lost ?? 0) >= 15 },
+    description: 'Total weight lost: 15 lbs', check: s => (s.lost ?? 0) >= 15, closeTo: nearLbsLost(15) },
   { id: 'lost-20', emoji: '🏆', name: '20 lbs Down', category: 'progress',
-    description: 'Total weight lost: 20 lbs', check: s => (s.lost ?? 0) >= 20 },
+    description: 'Total weight lost: 20 lbs', check: s => (s.lost ?? 0) >= 20, closeTo: nearLbsLost(20) },
   { id: 'lost-25', emoji: '🏆', name: '25 lbs Down', category: 'progress',
-    description: 'Total weight lost: 25 lbs', check: s => (s.lost ?? 0) >= 25 },
+    description: 'Total weight lost: 25 lbs', check: s => (s.lost ?? 0) >= 25, closeTo: nearLbsLost(25) },
   { id: 'lost-30', emoji: '👑', name: '30+ lbs Down', category: 'progress',
-    description: 'Total weight lost: 30+ lbs', check: s => (s.lost ?? 0) >= 30 },
+    description: 'Total weight lost: 30+ lbs', check: s => (s.lost ?? 0) >= 30, closeTo: nearLbsLost(30) },
 
   // ── Body-weight % (medical/health) ──
   { id: 'pct-5',  emoji: '🩺', name: 'Doctor Approved', category: 'progress',
     description: 'Lost 5% of body weight (clinically meaningful)',
-    check: s => (s.pctLost ?? 0) >= 0.05 },
+    check: s => (s.pctLost ?? 0) >= 0.05, closeTo: nearPctLost(0.05) },
   { id: 'pct-10', emoji: '✨', name: '10% Down', category: 'progress',
     description: 'Lost 10% of body weight',
-    check: s => (s.pctLost ?? 0) >= 0.10 },
+    check: s => (s.pctLost ?? 0) >= 0.10, closeTo: nearPctLost(0.10) },
 
   // ── Onederland (only if start ≥ 200) ──
   { id: 'onederland', emoji: '🎉', name: 'Onederland', category: 'progress',
     description: 'First log below 200 lbs',
-    check: hadOnederland },
+    check: hadOnederland, closeTo: nearOnederland },
 
   // ── New Decade — crossed into a lower 10-lb range ──
   { id: 'new-decade', emoji: '📉', name: 'New Decade', category: 'progress',
     description: 'Crossed into a lower 10-lb range',
-    check: hadNewDecade },
+    check: hadNewDecade, closeTo: nearNewDecade },
 
   // ── Weekly downtrend streaks ──
   { id: 'wave',    emoji: '🌊', name: 'Wave',    category: 'progress',
     description: '4 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 4 },
+    check: s => bestWeeklyStreakEver(s) >= 4,  closeTo: nearWeeklyStreak(4) },
   { id: 'tide',    emoji: '🌀', name: 'Tide',    category: 'progress',
     description: '8 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 8 },
+    check: s => bestWeeklyStreakEver(s) >= 8,  closeTo: nearWeeklyStreak(8) },
   { id: 'current', emoji: '⚡', name: 'Current', category: 'progress',
     description: '12 consecutive weeks of weekly-avg loss',
-    check: s => bestWeeklyStreakEver(s) >= 12 },
+    check: s => bestWeeklyStreakEver(s) >= 12, closeTo: nearWeeklyStreak(12) },
 
   // ── Goal achievements ──
   // First Milestone fires if any configured milestone was hit, OR you've simply
@@ -212,7 +308,8 @@ export const BADGES = [
     check: s => (s.milestones ?? []).length > 0 && (s.milestones ?? []).every(m => m.hit) },
   { id: 'goal-hit',        emoji: '🥇', name: 'Goal Crushed',    category: 'goals',
     description: 'Hit your final goal weight',
-    check: s => !!s.goalHit },
+    check: s => !!s.goalHit,
+    closeTo: nearGoalHit },
   { id: 'past-goal',       emoji: '🚀', name: 'Past Goal',       category: 'goals',
     description: '14+ days sustained 1+ lb below your goal',
     check: hadSustainedPastGoal },
@@ -223,13 +320,16 @@ export const BADGES = [
   // ── Commitment / time tracking ──
   { id: 'month-one', emoji: '📅', name: 'Month One', category: 'commitment',
     description: '30 days since your first log',
-    check: s => daysSinceFirstLog(s) >= 30 },
+    check: s => daysSinceFirstLog(s) >= 30,
+    closeTo: nearDaysTracking(30) },
   { id: 'the-og',    emoji: '🏛️', name: 'The OG',   category: 'commitment',
     description: '1 year tracking anniversary',
-    check: s => daysSinceFirstLog(s) >= 365 },
+    check: s => daysSinceFirstLog(s) >= 365,
+    closeTo: nearDaysTracking(365) },
   { id: 'hundred-club', emoji: '📒', name: 'Hundred Club', category: 'commitment',
     description: '100 total weigh-ins logged',
-    check: s => (s.weighIns ?? 0) >= 100 },
+    check: s => (s.weighIns ?? 0) >= 100,
+    closeTo: nearWeighIns(100) },
 
   // ── Resilience ──
   { id: 'comeback-kid', emoji: '🔄', name: 'Comeback Kid', category: 'resilience',
@@ -253,4 +353,21 @@ export function earnedBadges(stats) {
   return BADGES.filter(b => {
     try { return b.check(stats) } catch (e) { return false }
   }).map(b => b.id)
+}
+
+// Returns { badge, message } for the highest-priority unearned badge that is
+// "almost there" based on the latest stats, or null if nothing is close.
+// We pick the first badge in BADGES order so progress -> goals -> commitment
+// gets priority — typically the most exciting one is shown.
+export function nearestUnearnedBadge(stats) {
+  for (const badge of BADGES) {
+    let earned = false
+    try { earned = badge.check(stats) } catch (e) { earned = false }
+    if (earned) continue
+    if (!badge.closeTo) continue
+    let msg = null
+    try { msg = badge.closeTo(stats) } catch (e) { msg = null }
+    if (msg) return { badge, message: msg }
+  }
+  return null
 }

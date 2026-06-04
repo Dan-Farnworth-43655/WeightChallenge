@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { BADGES, earnedBadges } from '../utils/badges'
+import BadgeDetailsModal from './BadgeDetailsModal'
 
 const CATEGORY_LABELS = {
   consistency: 'Consistency',
@@ -12,6 +14,8 @@ const CATEGORY_LABELS = {
 // Group-wide badge gallery. Each badge shows who has earned it via small
 // colored initials. Locked badges are dimmed silhouettes.
 export default function BadgeWall({ allStats }) {
+  const [selectedBadge, setSelectedBadge] = useState(null)
+
   // For each badge, collect the list of participants who have earned it
   const earnedMap = {}
   for (const s of allStats) {
@@ -48,14 +52,14 @@ export default function BadgeWall({ allStats }) {
                 const earners = earnedMap[b.id] ?? []
                 const isLocked = earners.length === 0
                 return (
-                  <div
+                  <button
                     key={b.id}
-                    className={`rounded-xl border p-2 text-center transition-all ${
+                    onClick={() => setSelectedBadge(b)}
+                    className={`rounded-xl border p-2 text-center transition-all hover:scale-105 active:scale-95 ${
                       isLocked
-                        ? 'bg-slate-950/40 border-slate-800 opacity-50'
-                        : 'bg-slate-800 border-slate-700'
+                        ? 'bg-slate-950/40 border-slate-800 opacity-50 hover:opacity-80'
+                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
                     }`}
-                    title={`${b.name} — ${b.description}`}
                   >
                     <div className={`text-2xl mb-1 ${isLocked ? 'grayscale' : ''}`}>{b.emoji}</div>
                     <div className="text-[10px] font-bold text-slate-200 leading-tight">{b.name}</div>
@@ -66,20 +70,28 @@ export default function BadgeWall({ allStats }) {
                           key={p.id}
                           className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-black border border-slate-900"
                           style={{ backgroundColor: p.color, color: '#000' }}
-                          title={p.name}
                         >
                           {p.initials[0]}
                         </span>
                       ))}
-                      {earners.length === 0 && <span className="text-[9px] text-slate-600">locked</span>}
+                      {earners.length === 0 && <span className="text-[9px] text-slate-600">tap for details</span>}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Badge details modal — tap any badge to learn what unlocks it */}
+      {selectedBadge && (
+        <BadgeDetailsModal
+          badge={selectedBadge}
+          earners={earnedMap[selectedBadge.id] ?? []}
+          onClose={() => setSelectedBadge(null)}
+        />
+      )}
     </div>
   )
 }
