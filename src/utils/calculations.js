@@ -79,6 +79,59 @@ export function applyGoalOverride(participant, overrides) {
   }
 }
 
+// Day-of-week analysis: average delta per weekday across all log-to-log transitions.
+// Returns the best day (most negative avg) and worst day (most positive avg) with at
+// least MIN_SAMPLES occurrences. Null if there isn't enough data.
+const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+function analyzeDayOfWeek(myLogs) {
+  const MIN_SAMPLES = 3
+  const buckets = [[], [], [], [], [], [], []]
+  for (let i = 1; i < myLogs.length; i++) {
+    const delta = myLogs[i].weight - myLogs[i - 1].weight
+    const dow = new Date(myLogs[i].date + 'T00:00:00').getDay()
+    buckets[dow].push(delta)
+  }
+  const summary = buckets
+    .map((deltas, dow) => deltas.length >= MIN_SAMPLES ? ({
+      dow,
+      name: DOW_NAMES[dow],
+      count: deltas.length,
+      avg: deltas.reduce((a, b) => a + b, 0) / deltas.length,
+    }) : null)
+    .filter(Boolean)
+  if (summary.length === 0) return null
+  const best  = summary.reduce((a, b) => (a.avg < b.avg ? a : b))
+  const worst = summary.reduce((a, b) => (a.avg > b.avg ? a : b))
+  return { best, worst, all: summary }
+}
+
+// Weekly recap: for Mondays, summarize the previous Mon-Sun calendar week.
+// Returns null on non-Mondays or weeks with no logs.
+function weeklyRecap(myLogs) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  if (today.getDay() !== 1) return null
+  const lastSun = new Date(today); lastSun.setDate(today.getDate() - 1)
+  const lastMon = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6)
+  const fmt = d => d.toISOString().split('T')[0]
+  const lastMonStr = fmt(lastMon)
+  const lastSunStr = fmt(lastSun)
+  const weekLogs = myLogs.filter(l => l.date >= lastMonStr && l.date <= lastSunStr)
+  if (weekLogs.length === 0) return null
+  const first = weekLogs[0]
+  const last  = weekLogs[weekLogs.length - 1]
+  const delta = last.weight - first.weight
+  return {
+    weekStart: lastMon,
+    weekEnd: lastSun,
+    count: weekLogs.length,
+    delta,
+    firstWeight: first.weight,
+    lastWeight: last.weight,
+    // ISO date string used as a localStorage dismissal key
+    dismissKey: `recap_${lastMonStr}`,
+  }
+}
+
 /**
  * Build per-participant stats from a list of log entries.
  * logs: [{ participant, date (YYYY-MM-DD), weight }]
@@ -257,6 +310,39 @@ export function computeStats(participant, logs) {
     regressionData = { pts, slope, intercept, originMs, windowLogs, allLogs: myLogs }
   }
 
+  // Projection for the next milestone (or final goal if no remaining milestones):
+  // when will the current regression pace get them there, and how many days off
+  // are they vs the target date?
+  let nextProjection = null
+  if (regressionPace != null && current != null) {
+    const nextTarget = nextMilestone
+      ? { weight: nextMilestone.weight, date: nextMilestone.date, isGoal: false }
+      : (goal != null && goalDate ? { weight: goal, date: goalDate, isGoal: true } : null)
+    if (nextTarget && nextTarget.date) {
+      const lbsToGo = Math.max(0, current - nextTarget.weight)
+      if (regressionPace > 0 && lbsToGo > 0) {
+        const daysToHit = lbsToGo / regressionPace
+        const projectedHitDate = new Date(today.getTime() + daysToHit * 86400000)
+        const daysOff = Math.round((projectedHitDate - nextTarget.date) / 86400000)
+        nextProjection = {
+          target: nextTarget,
+          projectedHitDate,
+          daysOff,                        // negative = ahead of pace
+          status: daysOff <= 0 ? 'on-pace' : 'behind',
+        }
+      } else if (lbsToGo === 0) {
+        nextProjection = { target: nextTarget, status: 'hit' }
+      } else if (regressionPace <= 0) {
+        // Trending flat or up — won't make it at this rate
+        nextProjection = { target: nextTarget, status: 'not-on-pace' }
+      }
+    }
+  }
+
+  // Day-of-week analysis + weekly recap
+  const dowAnalysis  = analyzeDayOfWeek(myLogs)
+  const recap        = weeklyRecap(myLogs)
+
   return {
     participant,
     weighIns,
@@ -282,6 +368,9 @@ export function computeStats(participant, logs) {
     logStreak,
     logStreakAtRisk,
     daysSinceLastLog,
+    nextProjection,
+    dowAnalysis,
+    recap,
     logs: myLogs,
   }
 }

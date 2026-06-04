@@ -25,6 +25,60 @@ function todaysVerse() {
   return VERSES[dayOfYear % VERSES.length]
 }
 
+function WeeklyRecap({ recap, color }) {
+  if (!recap) return null
+  // Persist dismissal across sessions
+  const dismissed = typeof window !== 'undefined' && localStorage.getItem(recap.dismissKey) === '1'
+  const [hidden, setHidden] = useState(dismissed)
+  if (hidden) return null
+  const lost = recap.delta < 0
+  const flat = Math.abs(recap.delta) < 0.05
+  const expected = 7 // days in a week
+  const consistency = `${recap.count} of ${expected}`
+  return (
+    <div className="rounded-2xl border border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-slate-900 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <p className="text-xs uppercase tracking-wider text-sky-300 font-bold mb-1">📅 Last week's recap</p>
+          <p className="text-sm text-slate-200">
+            Logged <span className="font-bold text-white tabular-nums">{consistency}</span> days
+            {' · '}
+            {flat ? (
+              <span className="text-slate-300 font-semibold">flat</span>
+            ) : lost ? (
+              <>
+                <span className="text-emerald-300 font-bold tabular-nums">{recap.delta.toFixed(1)} lbs</span>
+                <span className="text-emerald-300"> 🎯</span>
+              </>
+            ) : (
+              <>
+                <span className="text-red-300 font-bold tabular-nums">+{recap.delta.toFixed(1)} lbs</span>
+              </>
+            )}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {lost && recap.count >= 5 ? "Solid week. Keep the momentum."
+             : lost ? "Less logs but progress — try to weigh in more this week."
+             : flat ? "Flat week. Reset and go again."
+             : recap.count >= 5 ? "Showed up consistently — next week's the comeback."
+             : "Light logging week. Let's get back on it."}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            try { localStorage.setItem(recap.dismissKey, '1') } catch (e) {}
+            setHidden(true)
+          }}
+          className="text-slate-500 hover:text-white text-lg leading-none px-2"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Verse({ reference, text }) {
   return (
     <div className="text-center px-4 py-1">
@@ -133,7 +187,7 @@ function StatCard({ stats }) {
   const {
     participant: p, current, goal, goalDate, goalHit, lost, pctLost, remaining, pctToGoal,
     daysToGoalDate, paceNeeded, milestones, pace, projectedFinish, projectedGoalDateWeight,
-    weighIns, streak, logStreak, logStreakAtRisk,
+    weighIns, streak, logStreak, logStreakAtRisk, nextProjection, dowAnalysis,
   } = stats
   const isGaining = lost < 0
 
@@ -247,6 +301,55 @@ function StatCard({ stats }) {
         </div>
       </div>
 
+      {/* Insight: projection for the next milestone (or final goal if all hit) */}
+      {nextProjection && nextProjection.status !== 'hit' && (
+        <div className="mt-3 rounded-xl border px-3 py-2 text-xs flex items-center gap-2"
+          style={{
+            backgroundColor: nextProjection.status === 'on-pace' ? 'rgba(16,185,129,0.08)'
+                           : nextProjection.status === 'behind'  ? 'rgba(245,158,11,0.08)'
+                           : 'rgba(239,68,68,0.08)',
+            borderColor:     nextProjection.status === 'on-pace' ? 'rgba(16,185,129,0.4)'
+                           : nextProjection.status === 'behind'  ? 'rgba(245,158,11,0.4)'
+                           : 'rgba(239,68,68,0.4)',
+          }}
+        >
+          <span className="text-base leading-none">
+            {nextProjection.status === 'on-pace' ? '📈' : nextProjection.status === 'behind' ? '⏳' : '⚠️'}
+          </span>
+          <div className="flex-1 leading-tight">
+            {nextProjection.status === 'not-on-pace' ? (
+              <span className="text-red-300">
+                Not trending toward <span className="font-bold">{nextProjection.target.weight} lbs</span> at current pace.
+              </span>
+            ) : (
+              <>
+                <span className="text-slate-300">
+                  At current pace, hits <span className="font-bold text-white">{nextProjection.target.weight} lbs</span>{' '}
+                  on <span className="font-bold text-white">{formatDate(nextProjection.projectedHitDate.toISOString().split('T')[0])}</span>
+                </span>
+                {' '}—{' '}
+                <span className={`font-bold ${nextProjection.status === 'on-pace' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {nextProjection.daysOff <= 0
+                    ? `${Math.abs(nextProjection.daysOff)} ${Math.abs(nextProjection.daysOff) === 1 ? 'day' : 'days'} early 🎉`
+                    : `${nextProjection.daysOff} ${nextProjection.daysOff === 1 ? 'day' : 'days'} late`}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Insight: best day of week (only show if we have enough data) */}
+      {dowAnalysis?.best && dowAnalysis.best.avg < 0 && (
+        <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs flex items-center gap-2">
+          <span className="text-base leading-none">📊</span>
+          <div className="flex-1 leading-tight text-slate-300">
+            Best day: <span className="font-bold text-sky-300">{dowAnalysis.best.name}s</span>
+            {' '}(avg <span className="font-semibold tabular-nums text-emerald-300">{dowAnalysis.best.avg.toFixed(2)} lbs</span>)
+          </div>
+        </div>
+      )}
+
       {/* Milestones + final goal */}
       <MilestoneList
         milestones={milestones}
@@ -349,6 +452,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           </div>
         )
       })}
+
+      {/* Weekly recap banner — Mondays only, dismissible */}
+      {myStats?.recap && <WeeklyRecap recap={myStats.recap} color={myStats.participant.color} />}
 
       {/* Group progress table — top of the dashboard, the accountability anchor */}
       {hasData && (
