@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS } from '../utils/calculations'
+import { formatDate, formatLongDate, formatProjectedFinish, todayStr, PARTICIPANTS, aggregateLogs } from '../utils/calculations'
 import WeightChart from './WeightChart'
 import PctLostChart from './PctLostChart'
 import LbsLostChart from './LbsLostChart'
@@ -190,7 +190,7 @@ function StatCard({ stats }) {
   const {
     participant: p, current, goal, goalDate, goalHit, lost, pctLost, remaining, pctToGoal,
     daysToGoalDate, paceNeeded, milestones, pace, projectedFinish, projectedGoalDateWeight,
-    weighIns, streak, logStreak, logStreakAtRisk, nextProjection, dowAnalysis,
+    weighIns, streak, logStreak, logStreakAtRisk, nextProjection, dowAnalysis, weekOverWeek,
   } = stats
   const isGaining = lost < 0
 
@@ -369,6 +369,28 @@ function StatCard({ stats }) {
         </div>
       )}
 
+      {/* Week-over-week comparison — smooths daily noise */}
+      {weekOverWeek && (
+        <div className="mt-2 rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-xs flex items-center gap-2">
+          <span className="text-base leading-none">📈</span>
+          <div className="flex-1 leading-tight">
+            <div className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Week avg</div>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-slate-400 tabular-nums">{weekOverWeek.lastAvg.toFixed(1)}</span>
+              <span className="text-slate-500 text-[10px]">→</span>
+              <span className="font-bold text-white tabular-nums">{weekOverWeek.thisAvg.toFixed(1)}</span>
+              <span className={`font-bold tabular-nums ${
+                weekOverWeek.delta < -0.05 ? 'text-emerald-300'
+                : weekOverWeek.delta >  0.05 ? 'text-red-300'
+                : 'text-slate-400'
+              }`}>
+                ({weekOverWeek.delta > 0 ? '+' : ''}{weekOverWeek.delta.toFixed(1)})
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Milestones + final goal */}
       <MilestoneList
         milestones={milestones}
@@ -417,6 +439,15 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
     setGroupView(v)
     try { localStorage.setItem('groupView', v) } catch (e) {}
   }
+  // 'daily' | 'weekly' | 'monthly' — bottom chart granularity
+  const [chartGran, setChartGran] = useState(() => {
+    try { return localStorage.getItem('chartGran') || 'daily' } catch (e) { return 'daily' }
+  })
+  const switchChartGran = (v) => {
+    setChartGran(v)
+    try { localStorage.setItem('chartGran', v) } catch (e) {}
+  }
+  const chartLogs = aggregateLogs(logs, chartGran)
 
   // Detect newly earned badges for the active user and queue toasts.
   // Also drops badges from "seen" that are no longer earned, so if criteria
@@ -720,20 +751,38 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
       {/* Wall of Fame — group-wide badge gallery */}
       {hasData && <BadgeWall allStats={allStats} />}
 
-      {/* Group trend charts — moved to the bottom of the dashboard */}
+      {/* Group trend charts — granularity toggle smooths daily noise */}
       {hasData && (
         <>
+          {/* Daily / Weekly / Monthly toggle */}
+          <div className="flex items-center justify-between gap-2 -mb-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Group Trends</h2>
+            <div className="bg-slate-900 rounded-full p-0.5 flex text-[10px] uppercase tracking-wider font-bold border border-slate-800">
+              {['daily', 'weekly', 'monthly'].map(g => (
+                <button
+                  key={g}
+                  onClick={() => switchChartGran(g)}
+                  className={`px-2.5 py-1 rounded-full transition-colors ${
+                    chartGran === g ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {g.charAt(0).toUpperCase() + g.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
             <h2 className="font-semibold text-sm text-slate-300 mb-4">Weight Over Time</h2>
-            <WeightChart logs={logs} participants={PARTICIPANTS} />
+            <WeightChart logs={chartLogs} participants={PARTICIPANTS} />
           </div>
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
             <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
-            <LbsLostChart logs={logs} participants={PARTICIPANTS} />
+            <LbsLostChart logs={chartLogs} participants={PARTICIPANTS} />
           </div>
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
             <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
-            <PctLostChart logs={logs} participants={PARTICIPANTS} />
+            <PctLostChart logs={chartLogs} participants={PARTICIPANTS} />
           </div>
         </>
       )}

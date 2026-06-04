@@ -54,6 +54,38 @@ function daysBetween(fromDate, toDate) {
   return Math.round((b - a) / 86400000)
 }
 
+// Aggregate logs into daily / weekly / monthly buckets. Returns a new array
+// of {participant, date, weight} where date is the period-start (Monday for
+// weekly, 1st-of-month for monthly) and weight is the period's average.
+// Daily passes through unchanged.
+export function aggregateLogs(logs, granularity) {
+  if (!granularity || granularity === 'daily') return logs
+  const buckets = {}
+  for (const log of logs) {
+    const d = new Date(log.date + 'T00:00:00')
+    let periodStart
+    if (granularity === 'weekly') {
+      const dow = d.getDay()
+      const monday = new Date(d)
+      monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+      periodStart = monday.toISOString().split('T')[0]
+    } else if (granularity === 'monthly') {
+      periodStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    } else {
+      periodStart = log.date
+    }
+    const key = `${log.participant}|${periodStart}`
+    if (!buckets[key]) buckets[key] = { participant: log.participant, date: periodStart, sum: 0, count: 0 }
+    buckets[key].sum   += log.weight
+    buckets[key].count++
+  }
+  return Object.values(buckets).map(b => ({
+    participant: b.participant,
+    date: b.date,
+    weight: parseFloat((b.sum / b.count).toFixed(2)),
+  }))
+}
+
 // Returns YYYY-MM-DD of the Monday of the week containing dateStr.
 function mondayOf(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
@@ -364,6 +396,34 @@ export function computeStats(participant, logs) {
   const dowAnalysis  = analyzeDayOfWeek(myLogs)
   const recap        = weeklyRecap(myLogs)
 
+  // Week-over-week comparison: this week's avg vs last week's avg.
+  // Calendar weeks (Mon-Sun). Null if either side has no logs.
+  let weekOverWeek = null
+  if (myLogs.length > 0) {
+    const todayDt = new Date(); todayDt.setHours(0, 0, 0, 0)
+    const dow = todayDt.getDay()
+    const thisMon = new Date(todayDt); thisMon.setDate(todayDt.getDate() - (dow === 0 ? 6 : dow - 1))
+    const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7)
+    const lastSun = new Date(thisMon); lastSun.setDate(thisMon.getDate() - 1)
+    const thisMonStr = thisMon.toISOString().split('T')[0]
+    const lastMonStr = lastMon.toISOString().split('T')[0]
+    const lastSunStr = lastSun.toISOString().split('T')[0]
+
+    const thisWeek = myLogs.filter(l => l.date >= thisMonStr)
+    const lastWeek = myLogs.filter(l => l.date >= lastMonStr && l.date <= lastSunStr)
+    if (thisWeek.length > 0 && lastWeek.length > 0) {
+      const thisAvg = thisWeek.reduce((s, l) => s + l.weight, 0) / thisWeek.length
+      const lastAvg = lastWeek.reduce((s, l) => s + l.weight, 0) / lastWeek.length
+      weekOverWeek = {
+        thisAvg,
+        lastAvg,
+        delta: thisAvg - lastAvg,
+        thisCount: thisWeek.length,
+        lastCount: lastWeek.length,
+      }
+    }
+  }
+
   return {
     participant,
     weighIns,
@@ -393,6 +453,7 @@ export function computeStats(participant, logs) {
     nextProjection,
     dowAnalysis,
     recap,
+    weekOverWeek,
     logs: myLogs,
   }
 }
