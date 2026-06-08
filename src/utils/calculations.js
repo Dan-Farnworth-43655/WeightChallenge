@@ -319,14 +319,20 @@ export function computeStats(participant, logs) {
     (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000 / 7
   )
 
+  // Only COMPLETED weeks count toward the streak — the current calendar week
+  // is in progress, so its transition vs last week is not yet decided. This
+  // keeps the streak in sync with the Monday recap's delta.
+  const thisWeekMon = mondayOf(todayStr())
+  const pastWeeks   = weeklyAvgs.filter(w => w.weekStart < thisWeekMon)
+
   let streak = 0
   let prevBestStreak = 0
   let run = 0
-  for (let i = 1; i < weeklyAvgs.length; i++) {
+  for (let i = 1; i < pastWeeks.length; i++) {
     // The streak only continues if the two weeks being compared are immediately
     // adjacent calendar weeks (no gaps) AND the avg met the tolerance.
-    const consecutive = weeksBetween(weeklyAvgs[i - 1].weekStart, weeklyAvgs[i].weekStart) === 1
-    const downOrFlat  = weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE
+    const consecutive = weeksBetween(pastWeeks[i - 1].weekStart, pastWeeks[i].weekStart) === 1
+    const downOrFlat  = pastWeeks[i].avg <= pastWeeks[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE
     if (consecutive && downOrFlat) {
       run++
     } else {
@@ -334,16 +340,18 @@ export function computeStats(participant, logs) {
       run = 0
     }
   }
-  // Active-streak gate: if the latest logged week is more than 1 calendar week
-  // behind the current week, the streak has gone stale — preserve it as
-  // prevBestStreak but show the active streak as 0.
-  if (weeklyAvgs.length > 0) {
-    const lastWeekStart = weeklyAvgs[weeklyAvgs.length - 1].weekStart
-    const thisWeekStart = mondayOf(todayStr())
-    if (weeksBetween(lastWeekStart, thisWeekStart) > 1) {
+  // Active-streak gate: the most recent COMPLETED week must be exactly "last
+  // calendar week" (1 week before the current one). If the latest past week
+  // is older than that, the streak is stale — preserve it as prevBestStreak.
+  if (pastWeeks.length > 0) {
+    const mostRecentPast = pastWeeks[pastWeeks.length - 1].weekStart
+    if (weeksBetween(mostRecentPast, thisWeekMon) !== 1) {
       if (run > prevBestStreak) prevBestStreak = run
       run = 0
     }
+  } else {
+    // No completed weeks at all — no streak possible
+    run = 0
   }
   streak = run
 
