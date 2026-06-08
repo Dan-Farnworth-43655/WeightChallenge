@@ -537,6 +537,55 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
       {/* Weekly recap banner — Mondays only, dismissible */}
       {myStats?.recap && <WeeklyRecap recap={myStats.recap} color={myStats.participant.color} />}
 
+      {/* Streaks scoreboard — everyone's logging + downtrend streaks at a glance */}
+      {hasData && (
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Streaks</h3>
+            <span className="text-[10px] text-slate-600">🗓️ days · 🔥 weeks</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {ranked.map(s => {
+              const p = s.participant
+              return (
+                <div key={p.id} className="flex flex-col items-center gap-1.5 py-1">
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black"
+                    style={{ backgroundColor: p.color + '33', color: p.color }}
+                  >
+                    {p.initials}
+                  </span>
+                  <div className="flex flex-col items-center gap-0.5 leading-tight tabular-nums">
+                    <span
+                      className={`text-xs font-bold ${
+                        s.logStreak >= 2
+                          ? (s.logStreakAtRisk ? 'text-amber-300' : 'text-sky-300')
+                          : 'text-slate-700'
+                      }`}
+                      title={
+                        s.logStreak >= 2
+                          ? (s.logStreakAtRisk
+                              ? 'Streak at risk — log today!'
+                              : `${s.logStreak}-day logging streak`)
+                          : 'No logging streak yet'
+                      }
+                    >
+                      🗓️ {s.logStreak >= 2 ? `${s.logStreak}d${s.logStreakAtRisk ? '!' : ''}` : '—'}
+                    </span>
+                    <span
+                      className={`text-xs font-bold ${s.streak >= 2 ? 'text-orange-300' : 'text-slate-700'}`}
+                      title={s.streak >= 2 ? `${s.streak}-week downtrend` : 'No weekly downtrend streak'}
+                    >
+                      🔥 {s.streak >= 2 ? `${s.streak}w` : '—'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Group progress table — top of the dashboard, the accountability anchor */}
       {hasData && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
