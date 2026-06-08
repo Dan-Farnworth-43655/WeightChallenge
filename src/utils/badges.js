@@ -33,7 +33,8 @@ function pctLostSinceCutoff(stats) {
 }
 
 // Best week-over-week loss-or-maintenance streak using only post-cutoff logs.
-// Uses the same 0.5-lb tolerance as the live weekly streak in calculations.js.
+// Uses the same 0.5-lb tolerance as the live weekly streak in calculations.js
+// and resets on any missing calendar-week gap.
 function bestWeeklyStreakSinceCutoff(stats) {
   const TOLERANCE = 0.5
   const logs = logsFromCutoff(stats)
@@ -49,10 +50,18 @@ function bestWeeklyStreakSinceCutoff(stats) {
     weekly[ws].sum   += l.weight
     weekly[ws].count++
   }
-  const weeks = Object.keys(weekly).sort().map(k => weekly[k].sum / weekly[k].count)
+  const entries = Object.keys(weekly).sort().map(k => ({
+    ws:  k,
+    avg: weekly[k].sum / weekly[k].count,
+  }))
+  const weeksBetween = (a, b) => Math.round(
+    (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000 / 7
+  )
   let best = 0, run = 0
-  for (let i = 1; i < weeks.length; i++) {
-    if (weeks[i] <= weeks[i - 1] + TOLERANCE) { run++; if (run > best) best = run }
+  for (let i = 1; i < entries.length; i++) {
+    const consecutive = weeksBetween(entries[i - 1].ws, entries[i].ws) === 1
+    const downOrFlat  = entries[i].avg <= entries[i - 1].avg + TOLERANCE
+    if (consecutive && downOrFlat) { run++; if (run > best) best = run }
     else run = 0
   }
   return best

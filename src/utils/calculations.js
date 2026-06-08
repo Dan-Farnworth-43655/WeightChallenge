@@ -299,13 +299,33 @@ export function computeStats(participant, logs) {
     .sort()
     .map(ws => ({ weekStart: ws, avg: weekAccum[ws].sum / weekAccum[ws].count }))
 
+  // Helper: number of calendar-weeks between two Monday-of-week date strings
+  const weeksBetween = (a, b) => Math.round(
+    (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000 / 7
+  )
+
   let streak = 0
   let prevBestStreak = 0
   let run = 0
   for (let i = 1; i < weeklyAvgs.length; i++) {
-    if (weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE) {
+    // The streak only continues if the two weeks being compared are immediately
+    // adjacent calendar weeks (no gaps) AND the avg met the tolerance.
+    const consecutive = weeksBetween(weeklyAvgs[i - 1].weekStart, weeklyAvgs[i].weekStart) === 1
+    const downOrFlat  = weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE
+    if (consecutive && downOrFlat) {
       run++
     } else {
+      if (run > prevBestStreak) prevBestStreak = run
+      run = 0
+    }
+  }
+  // Active-streak gate: if the latest logged week is more than 1 calendar week
+  // behind the current week, the streak has gone stale — preserve it as
+  // prevBestStreak but show the active streak as 0.
+  if (weeklyAvgs.length > 0) {
+    const lastWeekStart = weeklyAvgs[weeklyAvgs.length - 1].weekStart
+    const thisWeekStart = mondayOf(todayStr())
+    if (weeksBetween(lastWeekStart, thisWeekStart) > 1) {
       if (run > prevBestStreak) prevBestStreak = run
       run = 0
     }
