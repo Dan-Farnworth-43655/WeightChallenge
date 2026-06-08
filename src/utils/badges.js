@@ -32,8 +32,10 @@ function pctLostSinceCutoff(stats) {
   return baseline ? (baseline - current) / baseline : 0
 }
 
-// Best week-over-week loss streak using only post-cutoff logs.
+// Best week-over-week loss-or-maintenance streak using only post-cutoff logs.
+// Uses the same 0.5-lb tolerance as the live weekly streak in calculations.js.
 function bestWeeklyStreakSinceCutoff(stats) {
+  const TOLERANCE = 0.5
   const logs = logsFromCutoff(stats)
   if (logs.length === 0) return 0
   const weekly = {}
@@ -50,7 +52,7 @@ function bestWeeklyStreakSinceCutoff(stats) {
   const weeks = Object.keys(weekly).sort().map(k => weekly[k].sum / weekly[k].count)
   let best = 0, run = 0
   for (let i = 1; i < weeks.length; i++) {
-    if (weeks[i] <= weeks[i - 1]) { run++; if (run > best) best = run }
+    if (weeks[i] <= weeks[i - 1] + TOLERANCE) { run++; if (run > best) best = run }
     else run = 0
   }
   return best

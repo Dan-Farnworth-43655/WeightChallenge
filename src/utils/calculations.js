@@ -283,9 +283,11 @@ export function computeStats(participant, logs) {
     daysSinceLastLog = Math.max(0, Math.round((today - lastDate) / 86400000))
   }
 
-  // Weight-loss streak (WEEKLY): group logs by Mon–Sun calendar week, average each,
-  // then count consecutive weeks where avg <= previous week's avg. Smooths out daily
-  // water/sodium noise so the streak reflects real trend, not scale fluctuations.
+  // Weight-loss / maintenance streak (WEEKLY): group logs by Mon–Sun, average each,
+  // then count consecutive weeks where avg is "down or maintained" vs the prior
+  // week. Allows up to STREAK_MAINTENANCE_TOLERANCE lbs of weekly-avg drift up
+  // before breaking the streak — anything within that range is treated as noise.
+  const STREAK_MAINTENANCE_TOLERANCE = 0.5
   const weekAccum = {}
   for (const l of myLogs) {
     const ws = mondayOf(l.date)
@@ -301,7 +303,7 @@ export function computeStats(participant, logs) {
   let prevBestStreak = 0
   let run = 0
   for (let i = 1; i < weeklyAvgs.length; i++) {
-    if (weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg) {
+    if (weeklyAvgs[i].avg <= weeklyAvgs[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE) {
       run++
     } else {
       if (run > prevBestStreak) prevBestStreak = run
