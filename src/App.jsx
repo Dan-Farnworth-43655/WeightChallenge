@@ -156,7 +156,7 @@ export default function App() {
                 🗓️ {myStats.logStreak}d
               </span>
             )}
-            {myStats?.streak >= 2 && (
+            {myStats?.streak >= 1 && (
               <span
                 className="text-[10px] font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5 whitespace-nowrap"
                 title={`${myStats.streak}-week downtrend`}

@@ -245,7 +245,7 @@ function StatCard({ stats }) {
               🗓️ {logStreak}d{logStreakAtRisk ? '!' : ''}
             </span>
           )}
-          {streak >= 2 && (
+          {streak >= 1 && (
             <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week downtrend (weekly average down)`}>
               🔥 {streak}w
             </span>
@@ -600,10 +600,10 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
                       🗓️ {s.logStreak >= 2 ? `${s.logStreak}d${s.logStreakAtRisk ? '!' : ''}` : '—'}
                     </span>
                     <span
-                      className={`text-xs font-bold ${s.streak >= 2 ? 'text-orange-300' : 'text-slate-700'}`}
-                      title={s.streak >= 2 ? `${s.streak}-week downtrend` : 'No weekly downtrend streak'}
+                      className={`text-xs font-bold ${s.streak >= 1 ? 'text-orange-300' : 'text-slate-700'}`}
+                      title={s.streak >= 1 ? `${s.streak}-week downtrend` : 'No weekly downtrend streak'}
                     >
-                      🔥 {s.streak >= 2 ? `${s.streak}w` : '—'}
+                      🔥 {s.streak >= 1 ? `${s.streak}w` : '—'}
                     </span>
                   </div>
                 </div>
