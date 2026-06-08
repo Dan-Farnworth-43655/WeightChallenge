@@ -28,55 +28,82 @@ function todaysVerse() {
   return VERSES[dayOfYear % VERSES.length]
 }
 
-function WeeklyRecap({ recap, color }) {
-  if (!recap) return null
-  // Persist dismissal across sessions
-  const dismissed = typeof window !== 'undefined' && localStorage.getItem(recap.dismissKey) === '1'
-  const [hidden, setHidden] = useState(dismissed)
-  if (hidden) return null
-  const lost = recap.delta < 0
-  const flat = Math.abs(recap.delta) < 0.05
-  const expected = 7 // days in a week
-  const consistency = `${recap.count} of ${expected}`
+function GroupWeeklyRecap({ allStats }) {
+  // Use any participant's recap to detect "it's Monday and someone has data"
+  const anyRecap = allStats.find(s => s.recap)?.recap
+  const [hidden, setHidden] = useState(() => {
+    try { return anyRecap && localStorage.getItem(anyRecap.dismissKey) === '1' } catch (e) { return false }
+  })
+  if (!anyRecap || hidden) return null
+
+  // Sort by delta ascending so biggest losers appear first (kindest reading)
+  const rows = [...allStats]
+    .filter(s => !s.participant.observer)
+    .sort((a, b) => {
+      const ad = a.recap ? a.recap.delta : Infinity
+      const bd = b.recap ? b.recap.delta : Infinity
+      return ad - bd
+    })
+
+  const dismiss = () => {
+    try { localStorage.setItem(anyRecap.dismissKey, '1') } catch (e) {}
+    setHidden(true)
+  }
+
   return (
     <div className="rounded-2xl border border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-slate-900 px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <p className="text-xs uppercase tracking-wider text-sky-300 font-bold mb-1">📅 Last week's recap</p>
-          <p className="text-sm text-slate-200">
-            Logged <span className="font-bold text-white tabular-nums">{consistency}</span> days
-            {' · '}
-            {flat ? (
-              <span className="text-slate-300 font-semibold">flat</span>
-            ) : lost ? (
-              <>
-                <span className="text-emerald-300 font-bold tabular-nums">{recap.delta.toFixed(1)} lbs</span>
-                <span className="text-emerald-300"> 🎯</span>
-              </>
-            ) : (
-              <>
-                <span className="text-red-300 font-bold tabular-nums">+{recap.delta.toFixed(1)} lbs</span>
-              </>
-            )}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-1">
-            {lost && recap.count >= 5 ? "Solid week. Keep the momentum."
-             : lost ? "Less logs but progress — try to weigh in more this week."
-             : flat ? "Flat week. Reset and go again."
-             : recap.count >= 5 ? "Showed up consistently — next week's the comeback."
-             : "Light logging week. Let's get back on it."}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-sky-300 font-bold">📅 Last week's recap</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            How everyone did
           </p>
         </div>
         <button
-          onClick={() => {
-            try { localStorage.setItem(recap.dismissKey, '1') } catch (e) {}
-            setHidden(true)
-          }}
+          onClick={dismiss}
           className="text-slate-500 hover:text-white text-lg leading-none px-2"
           aria-label="Dismiss"
         >
           ✕
         </button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {rows.map(s => {
+          const p = s.participant
+          const r = s.recap
+          const lost = r && r.delta < 0
+          const gained = r && r.delta > 0.05
+          const flat = r && Math.abs(r.delta) < 0.05
+          return (
+            <div key={p.id} className="flex items-center justify-between text-sm py-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0"
+                  style={{ backgroundColor: p.color + '33', color: p.color }}
+                >
+                  {p.initials}
+                </span>
+                <span className="text-slate-200 truncate">{p.name}</span>
+              </div>
+              {r ? (
+                <div className="flex items-center gap-3 tabular-nums shrink-0">
+                  <span className="text-[11px] text-slate-400">{r.count}/7d</span>
+                  {flat ? (
+                    <span className="font-bold text-slate-400 text-xs">flat</span>
+                  ) : lost ? (
+                    <span className="font-bold text-emerald-300 text-sm">{r.delta.toFixed(1)} 🎯</span>
+                  ) : gained ? (
+                    <span className="font-bold text-red-300 text-sm">+{r.delta.toFixed(1)}</span>
+                  ) : (
+                    <span className="font-bold text-slate-400 text-xs">flat</span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-500 italic shrink-0">no logs</span>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -534,8 +561,8 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         )
       })}
 
-      {/* Weekly recap banner — Mondays only, dismissible */}
-      {myStats?.recap && <WeeklyRecap recap={myStats.recap} color={myStats.participant.color} />}
+      {/* Weekly recap banner — Mondays only, group-wide, dismissible */}
+      <GroupWeeklyRecap allStats={allStats} />
 
       {/* Streaks scoreboard — everyone's logging + downtrend streaks at a glance */}
       {hasData && (
