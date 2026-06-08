@@ -137,28 +137,43 @@ function analyzeDayOfWeek(myLogs) {
   return { best, worst, all: summary }
 }
 
-// Weekly recap: for Mondays, summarize the previous Mon-Sun calendar week.
-// Returns null on non-Mondays or weeks with no logs.
+// Weekly recap: on Mondays, summarize last Mon–Sun by comparing its average
+// to the prior week's average. Same comparison rule as the streak — so if
+// the recap shows a negative delta, the user has earned the flame.
+// Returns null on non-Mondays or weeks with no logs in last week.
 function weeklyRecap(myLogs) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   if (today.getDay() !== 1) return null
-  const lastSun = new Date(today); lastSun.setDate(today.getDate() - 1)
-  const lastMon = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6)
+
+  const lastSun  = new Date(today);   lastSun.setDate(today.getDate() - 1)
+  const lastMon  = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6)
+  const priorSun = new Date(lastMon); priorSun.setDate(lastMon.getDate() - 1)
+  const priorMon = new Date(priorSun); priorMon.setDate(priorSun.getDate() - 6)
+
   const fmt = d => d.toISOString().split('T')[0]
-  const lastMonStr = fmt(lastMon)
-  const lastSunStr = fmt(lastSun)
-  const weekLogs = myLogs.filter(l => l.date >= lastMonStr && l.date <= lastSunStr)
-  if (weekLogs.length === 0) return null
-  const first = weekLogs[0]
-  const last  = weekLogs[weekLogs.length - 1]
-  const delta = last.weight - first.weight
+  const lastMonStr  = fmt(lastMon)
+  const lastSunStr  = fmt(lastSun)
+  const priorMonStr = fmt(priorMon)
+  const priorSunStr = fmt(priorSun)
+
+  const lastWeekLogs  = myLogs.filter(l => l.date >= lastMonStr  && l.date <= lastSunStr)
+  const priorWeekLogs = myLogs.filter(l => l.date >= priorMonStr && l.date <= priorSunStr)
+  if (lastWeekLogs.length === 0) return null
+
+  const lastAvg  = lastWeekLogs.reduce((s, l) => s + l.weight, 0) / lastWeekLogs.length
+  const priorAvg = priorWeekLogs.length > 0
+    ? priorWeekLogs.reduce((s, l) => s + l.weight, 0) / priorWeekLogs.length
+    : null
+  const delta = priorAvg != null ? lastAvg - priorAvg : null
+
   return {
     weekStart: lastMon,
     weekEnd: lastSun,
-    count: weekLogs.length,
+    count: lastWeekLogs.length,
     delta,
-    firstWeight: first.weight,
-    lastWeight: last.weight,
+    lastAvg,
+    priorAvg,
+    firstTrackedWeek: priorAvg == null,
     // ISO date string used as a localStorage dismissal key
     dismissKey: `recap_${lastMonStr}`,
   }

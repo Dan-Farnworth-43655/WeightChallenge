@@ -71,11 +71,11 @@ function GroupWeeklyRecap({ allStats }) {
         {rows.map(s => {
           const p = s.participant
           const r = s.recap
-          const lost = r && r.delta < 0
-          const gained = r && r.delta > 0.05
-          const flat = r && Math.abs(r.delta) < 0.05
+          const lost   = r && r.delta != null && r.delta < -0.05
+          const gained = r && r.delta != null && r.delta >  0.05
+          const flat   = r && r.delta != null && Math.abs(r.delta) <= 0.05
           return (
-            <div key={p.id} className="flex items-center justify-between text-sm py-1">
+            <div key={p.id} className="flex items-center justify-between text-sm py-1 gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0"
@@ -86,17 +86,20 @@ function GroupWeeklyRecap({ allStats }) {
                 <span className="text-slate-200 truncate">{p.name}</span>
               </div>
               {r ? (
-                <div className="flex items-center gap-3 tabular-nums shrink-0">
-                  <span className="text-[11px] text-slate-400">{r.count}/7d</span>
-                  {flat ? (
+                <div className="flex items-baseline gap-2 tabular-nums shrink-0">
+                  <span className="text-[10px] text-slate-500">{r.count}/7d</span>
+                  <span className="text-slate-300 text-xs" title="Last week's average">
+                    {r.lastAvg.toFixed(1)}
+                  </span>
+                  {r.firstTrackedWeek ? (
+                    <span className="text-[10px] text-slate-500 italic">first week</span>
+                  ) : flat ? (
                     <span className="font-bold text-slate-400 text-xs">flat</span>
                   ) : lost ? (
                     <span className="font-bold text-emerald-300 text-sm">{r.delta.toFixed(1)} 🎯</span>
                   ) : gained ? (
                     <span className="font-bold text-red-300 text-sm">+{r.delta.toFixed(1)}</span>
-                  ) : (
-                    <span className="font-bold text-slate-400 text-xs">flat</span>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <span className="text-[11px] text-slate-500 italic shrink-0">no logs</span>
