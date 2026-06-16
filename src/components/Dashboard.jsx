@@ -461,6 +461,7 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const today = todayStr()
   const [editingGoals, setEditingGoals] = useState(false)
   const [unlockQueue, setUnlockQueue] = useState([])
+  const [viewedStatsId, setViewedStatsId] = useState(activeUser)
   // 'lifetime' | 'next' — group progress table view
   const [groupView, setGroupView] = useState(() => {
     try { return localStorage.getItem('groupView') || 'lifetime' } catch (e) { return 'lifetime' }
@@ -774,21 +775,56 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         </div>
       )}
 
-      {/* Your own card */}
-      {hasData && myStats && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-slate-300">Your Progress</h2>
-            <button
-              onClick={() => setEditingGoals(true)}
-              className="text-xs text-slate-500 hover:text-sky-400 transition-colors font-semibold"
-            >
-              ⚙️ Edit goal
-            </button>
+      {/* Stats with participant switcher — defaults to active user, tap to see others */}
+      {hasData && (() => {
+        const viewedStats = ranked.find(s => s.participant.id === viewedStatsId) ?? myStats
+        if (!viewedStats) return null
+        const isViewingSelf = viewedStats.participant.id === activeUser
+        return (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-sm text-slate-300">Individual Stats</h2>
+              {isViewingSelf && (
+                <button
+                  onClick={() => setEditingGoals(true)}
+                  className="text-xs text-slate-500 hover:text-sky-400 transition-colors font-semibold"
+                >
+                  ⚙️ Edit goal
+                </button>
+              )}
+            </div>
+
+            {/* Participant pills */}
+            <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+              {ranked.map(s => {
+                const p = s.participant
+                const active = p.id === viewedStats.participant.id
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setViewedStatsId(p.id)}
+                    className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                      active ? 'shadow-md' : 'opacity-50 hover:opacity-100'
+                    }`}
+                    style={
+                      active
+                        ? { backgroundColor: p.color, color: '#000' }
+                        : { backgroundColor: p.color + '22', color: p.color, border: `1px solid ${p.color}44` }
+                    }
+                  >
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black bg-black/20">
+                      {p.initials}
+                    </span>
+                    {p.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            <StatCardWithRegression stats={viewedStats} />
           </div>
-          <StatCardWithRegression stats={myStats} />
-        </div>
-      )}
+        )
+      })()}
 
       {/* Badge unlock toast — fires when active user newly earns one */}
       {unlockQueue.length > 0 && myStats && (
@@ -816,19 +852,6 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
         const v = todaysVerse()
         return <Verse reference={v.reference} text={v.text} />
       })()}
-
-      {/* Teammates' individual stat cards (active user excluded — already shown above) */}
-      {hasData && otherStats.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <h2 className="font-semibold text-sm text-slate-300">Everyone Else</h2>
-          {otherStats.map(stats => (
-            <StatCardWithRegression key={stats.participant.id} stats={stats} />
-          ))}
-        </div>
-      )}
-
-      {/* Wall of Fame — group-wide badge gallery */}
-      {hasData && <BadgeWall allStats={allStats} />}
 
       {/* Group trend charts — granularity toggle smooths daily noise */}
       {hasData && (
@@ -865,6 +888,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           </div>
         </>
       )}
+
+      {/* Wall of Fame — at the very bottom */}
+      {hasData && <BadgeWall allStats={allStats} />}
     </div>
   )
 }
