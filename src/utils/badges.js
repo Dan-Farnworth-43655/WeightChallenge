@@ -23,13 +23,24 @@ function bestLogStreakSinceCutoff(stats) {
   return best
 }
 
-// % body weight lost using post-cutoff baseline (first log on/after cutoff vs current).
+// % body weight lost using post-cutoff baseline (first log on/after cutoff vs
+// the LOWEST weight reached since) — badges are earned forever, so a later
+// regain never un-earns them.
 function pctLostSinceCutoff(stats) {
   const logs = logsFromCutoff(stats).sort((a, b) => a.date.localeCompare(b.date))
   if (logs.length < 2) return 0
   const baseline = logs[0].weight
-  const current  = logs[logs.length - 1].weight
-  return baseline ? (baseline - current) / baseline : 0
+  const lowest   = Math.min(...logs.map(l => l.weight))
+  return baseline ? (baseline - lowest) / baseline : 0
+}
+
+// Most total lbs ever lost: first log ever vs the lowest weight ever reached.
+// Used for the lbs-down badges so they stay earned through a regain.
+function maxLostEver(stats) {
+  const logs = stats.logs ?? []
+  if (logs.length === 0 || stats.effectiveStart == null) return 0
+  const lowest = Math.min(...logs.map(l => l.weight))
+  return stats.effectiveStart - lowest
 }
 
 // Best week-over-week loss streak using only post-cutoff logs.
@@ -377,19 +388,20 @@ export const BADGES = [
     check: s => bestLogStreakSinceCutoff(s) >= 100,
     closeTo: nearLogStreak(100) },
 
-  // ── Weight loss milestones (5-lb increments) ──
+  // ── Weight loss milestones (5-lb increments) — once earned, kept forever
+  //    (based on the lowest weight ever reached, not current weight) ──
   { id: 'lost-5',  emoji: '⭐', name: '5 lbs Down',  category: 'progress',
-    description: 'Total weight lost: 5 lbs',  check: s => (s.lost ?? 0) >= 5,  closeTo: nearLbsLost(5) },
+    description: 'Total weight lost: 5 lbs',  check: s => maxLostEver(s) >= 5,  closeTo: nearLbsLost(5) },
   { id: 'lost-10', emoji: '⭐', name: '10 lbs Down', category: 'progress',
-    description: 'Total weight lost: 10 lbs', check: s => (s.lost ?? 0) >= 10, closeTo: nearLbsLost(10) },
+    description: 'Total weight lost: 10 lbs', check: s => maxLostEver(s) >= 10, closeTo: nearLbsLost(10) },
   { id: 'lost-15', emoji: '⭐', name: '15 lbs Down', category: 'progress',
-    description: 'Total weight lost: 15 lbs', check: s => (s.lost ?? 0) >= 15, closeTo: nearLbsLost(15) },
+    description: 'Total weight lost: 15 lbs', check: s => maxLostEver(s) >= 15, closeTo: nearLbsLost(15) },
   { id: 'lost-20', emoji: '🏆', name: '20 lbs Down', category: 'progress',
-    description: 'Total weight lost: 20 lbs', check: s => (s.lost ?? 0) >= 20, closeTo: nearLbsLost(20) },
+    description: 'Total weight lost: 20 lbs', check: s => maxLostEver(s) >= 20, closeTo: nearLbsLost(20) },
   { id: 'lost-25', emoji: '🏆', name: '25 lbs Down', category: 'progress',
-    description: 'Total weight lost: 25 lbs', check: s => (s.lost ?? 0) >= 25, closeTo: nearLbsLost(25) },
+    description: 'Total weight lost: 25 lbs', check: s => maxLostEver(s) >= 25, closeTo: nearLbsLost(25) },
   { id: 'lost-30', emoji: '👑', name: '30+ lbs Down', category: 'progress',
-    description: 'Total weight lost: 30+ lbs', check: s => (s.lost ?? 0) >= 30, closeTo: nearLbsLost(30) },
+    description: 'Total weight lost: 30+ lbs', check: s => maxLostEver(s) >= 30, closeTo: nearLbsLost(30) },
 
   // ── Body-weight % (medical/health) — non-retroactive ──
   { id: 'pct-5',  emoji: '🩺', name: 'Doctor Approved', category: 'progress',
@@ -434,16 +446,17 @@ export const BADGES = [
     description: '12 consecutive weeks of weekly-avg loss — earned going forward',
     check: s => bestWeeklyStreakSinceCutoff(s) >= 12, closeTo: nearWeeklyStreak(12) },
 
-  // ── Goal achievements ──
+  // ── Goal achievements — once earned, kept forever (any historical log at or
+  //    below the target counts, even if weight later bounced back above) ──
   { id: 'first-milestone', emoji: '🥉', name: 'First Milestone', category: 'goals',
     description: 'Hit your first configured milestone weight',
-    check: s => (s.milestones ?? []).some(m => m.hit) },
+    check: s => (s.milestones ?? []).some(m => m.hitDate != null) },
   { id: 'all-milestones',  emoji: '🥈', name: 'All Milestones',  category: 'goals',
     description: 'Hit every milestone',
-    check: s => (s.milestones ?? []).length > 0 && (s.milestones ?? []).every(m => m.hit) },
+    check: s => (s.milestones ?? []).length > 0 && (s.milestones ?? []).every(m => m.hitDate != null) },
   { id: 'goal-hit',        emoji: '🥇', name: 'Goal Crushed',    category: 'goals',
     description: 'Hit your final goal weight',
-    check: s => !!s.goalHit,
+    check: s => s.goal != null && (s.logs ?? []).some(l => l.weight <= s.goal),
     closeTo: nearGoalHit },
   { id: 'past-goal',       emoji: '🚀', name: 'Past Goal',       category: 'goals',
     description: '14+ days sustained 1+ lb below your goal',

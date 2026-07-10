@@ -482,10 +482,9 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   // Detect newly earned badges for the active user and queue toasts.
   // The "seen" set is monotonic — once a badge has toasted we never forget it,
-  // so each achievement is celebrated exactly once. This matters because many
-  // badges are computed from CURRENT weight (lbs lost, %-lost, goal hit,
-  // milestones) and flip back to un-earned on a weight regain; without the
-  // union below, re-crossing the threshold would re-fire the same toast.
+  // so each achievement is celebrated exactly once. Badge checks are also
+  // earned-forever now, but a goal/milestone edit can still un-earn one; the
+  // union below guarantees that even then it never re-fires the same toast.
   useEffect(() => {
     if (!activeUser) return
     const me = allStats.find(s => s.participant.id === activeUser)
