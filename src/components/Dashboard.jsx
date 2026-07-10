@@ -249,7 +249,7 @@ function StatCard({ stats }) {
             </span>
           )}
           {streak >= 1 && (
-            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss-or-maintenance streak (weekly avg held or dropped)`}>
+            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss streak (weekly avg dropped each completed week)`}>
               🔥 {streak}w
             </span>
           )}
@@ -481,8 +481,11 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const chartLogs = aggregateLogs(logs, chartGran)
 
   // Detect newly earned badges for the active user and queue toasts.
-  // Also drops badges from "seen" that are no longer earned, so if criteria
-  // ever changes and the badge re-earns later, it triggers a fresh toast.
+  // The "seen" set is monotonic — once a badge has toasted we never forget it,
+  // so each achievement is celebrated exactly once. This matters because many
+  // badges are computed from CURRENT weight (lbs lost, %-lost, goal hit,
+  // milestones) and flip back to un-earned on a weight regain; without the
+  // union below, re-crossing the threshold would re-fire the same toast.
   useEffect(() => {
     if (!activeUser) return
     const me = allStats.find(s => s.participant.id === activeUser)
@@ -495,9 +498,10 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
     if (newly.length > 0) {
       const newBadges = newly.map(id => BADGES.find(b => b.id === id)).filter(Boolean)
       setUnlockQueue(newBadges)
+      // Add the newly-earned ids to "seen" (union) — never remove on un-earn.
+      const merged = [...new Set([...seen, ...earned])]
+      try { localStorage.setItem(key, JSON.stringify(merged)) } catch (e) {}
     }
-    // Persist exactly what's currently earned — drops stale "seen" entries
-    try { localStorage.setItem(key, JSON.stringify(earned)) } catch (e) {}
   }, [activeUser, allStats])
 
   const dismissUnlock = () => setUnlockQueue(q => q.slice(1))

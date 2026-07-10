@@ -298,11 +298,12 @@ export function computeStats(participant, logs) {
     daysSinceLastLog = Math.max(0, Math.round((today - lastDate) / 86400000))
   }
 
-  // Weight-loss / maintenance streak (WEEKLY): group logs by Mon–Sun, average each,
-  // then count consecutive weeks where avg is "down or maintained" vs the prior
-  // week. Allows up to STREAK_MAINTENANCE_TOLERANCE lbs of weekly-avg drift up
-  // before breaking the streak — anything within that range is treated as noise.
-  const STREAK_MAINTENANCE_TOLERANCE = 0.5
+  // Weight-loss streak (WEEKLY): group logs by Mon–Sun, average each, then count
+  // consecutive weeks where the avg is down (or exactly flat) vs the prior week.
+  // No upward tolerance — averaging a full week of logs already smooths daily
+  // noise, and any allowance lets consecutive small gains compound into a real
+  // uptrend while the flame stays lit.
+  const STREAK_MAINTENANCE_TOLERANCE = 0
   const weekAccum = {}
   for (const l of myLogs) {
     const ws = mondayOf(l.date)
