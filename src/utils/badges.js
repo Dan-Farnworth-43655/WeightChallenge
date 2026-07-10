@@ -44,11 +44,12 @@ function maxLostEver(stats) {
 }
 
 // Best week-over-week loss streak using only post-cutoff logs.
-// Same rule as the live weekly streak in calculations.js — weekly avg must be
-// down or exactly flat (no upward tolerance) — and resets on any missing
+// Same rule as the live weekly streak in calculations.js — weekly avg must
+// hold within TOLERANCE of the current streak's lowest weekly avg (noise is
+// forgiven, cumulative drift up is not) — and resets on any missing
 // calendar-week gap.
 function bestWeeklyStreakSinceCutoff(stats) {
-  const TOLERANCE = 0
+  const TOLERANCE = 0.25
   const logs = logsFromCutoff(stats)
   if (logs.length === 0) return 0
   const weekly = {}
@@ -70,11 +71,18 @@ function bestWeeklyStreakSinceCutoff(stats) {
     (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000 / 7
   )
   let best = 0, run = 0
+  let runMin = entries.length > 0 ? entries[0].avg : null
   for (let i = 1; i < entries.length; i++) {
     const consecutive = weeksBetween(entries[i - 1].ws, entries[i].ws) === 1
-    const downOrFlat  = entries[i].avg <= entries[i - 1].avg + TOLERANCE
-    if (consecutive && downOrFlat) { run++; if (run > best) best = run }
-    else run = 0
+    const withinBand  = entries[i].avg <= runMin + TOLERANCE
+    if (consecutive && withinBand) {
+      run++
+      runMin = Math.min(runMin, entries[i].avg)
+      if (run > best) best = run
+    } else {
+      run = 0
+      runMin = entries[i].avg
+    }
   }
   return best
 }

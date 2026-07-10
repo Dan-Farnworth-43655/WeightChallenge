@@ -249,7 +249,7 @@ function StatCard({ stats }) {
             </span>
           )}
           {streak >= 1 && (
-            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss streak (weekly avg dropped each completed week)`}>
+            <span className="text-xs font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5" title={`${streak}-week loss streak (weekly avg holding at or below the streak's low point)`}>
               🔥 {streak}w
             </span>
           )}

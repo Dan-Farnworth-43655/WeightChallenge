@@ -299,11 +299,12 @@ export function computeStats(participant, logs) {
   }
 
   // Weight-loss streak (WEEKLY): group logs by Mon–Sun, average each, then count
-  // consecutive weeks where the avg is down (or exactly flat) vs the prior week.
-  // No upward tolerance — averaging a full week of logs already smooths daily
-  // noise, and any allowance lets consecutive small gains compound into a real
-  // uptrend while the flame stays lit.
-  const STREAK_MAINTENANCE_TOLERANCE = 0
+  // consecutive weeks where the avg holds at or below the LOWEST weekly avg of
+  // the current streak, plus a small noise tolerance. Anchoring the tolerance
+  // to the streak's low (instead of just the prior week) means tiny wiggles are
+  // forgiven but consecutive small gains can't compound into a real uptrend
+  // while the flame stays lit.
+  const STREAK_MAINTENANCE_TOLERANCE = 0.25
   const weekAccum = {}
   for (const l of myLogs) {
     const ws = mondayOf(l.date)
@@ -329,16 +330,22 @@ export function computeStats(participant, logs) {
   let streak = 0
   let prevBestStreak = 0
   let run = 0
+  // Lowest weekly avg seen in the current run — the anchor the tolerance is
+  // measured against. Resets whenever the streak breaks.
+  let runMin = pastWeeks.length > 0 ? pastWeeks[0].avg : null
   for (let i = 1; i < pastWeeks.length; i++) {
     // The streak only continues if the two weeks being compared are immediately
-    // adjacent calendar weeks (no gaps) AND the avg met the tolerance.
+    // adjacent calendar weeks (no gaps) AND the avg held within tolerance of
+    // the current streak's lowest weekly avg.
     const consecutive = weeksBetween(pastWeeks[i - 1].weekStart, pastWeeks[i].weekStart) === 1
-    const downOrFlat  = pastWeeks[i].avg <= pastWeeks[i - 1].avg + STREAK_MAINTENANCE_TOLERANCE
-    if (consecutive && downOrFlat) {
+    const withinBand  = pastWeeks[i].avg <= runMin + STREAK_MAINTENANCE_TOLERANCE
+    if (consecutive && withinBand) {
       run++
+      runMin = Math.min(runMin, pastWeeks[i].avg)
     } else {
       if (run > prevBestStreak) prevBestStreak = run
       run = 0
+      runMin = pastWeeks[i].avg
     }
   }
   // Active-streak gate: the most recent COMPLETED week must be exactly "last
