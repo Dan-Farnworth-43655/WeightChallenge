@@ -28,12 +28,21 @@ function lastWeekRanks(allStats, metric) {
   return map
 }
 
+// Missing 2+ days in a row sinks a person to the bottom of the leaderboard,
+// below every active logger, regardless of how good their metric looks.
+// Keeps someone from coasting at #1 on stale data.
+const STALE_DAYS = 2
+function isStale(s) {
+  return (s.daysSinceLastLog ?? 0) >= STALE_DAYS
+}
+
 function Chip({ tone, children }) {
   const tones = {
     pr:     'text-amber-300 bg-amber-400/10 border-amber-400/30',
     streak: 'text-orange-300 bg-orange-500/10 border-orange-500/30',
     log:    'text-sky-300 bg-sky-500/10 border-sky-500/30',
     logRisk:'text-amber-300 bg-amber-500/10 border-amber-500/30',
+    stale:  'text-red-300 bg-red-500/10 border-red-500/30',
   }
   return (
     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border whitespace-nowrap tabular-nums ${tones[tone]}`}>
@@ -54,6 +63,8 @@ export default function Leaderboard({ allStats, prByParticipant }) {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
 
   const rows = [...allStats].sort((a, b) => {
+    const aStale = isStale(a), bStale = isStale(b)
+    if (aStale !== bStale) return aStale ? 1 : -1 // stale always sinks below active loggers
     const av = metric === 'lost' ? (a.pctLost ?? 0) : (a.pctToGoal ?? 0)
     const bv = metric === 'lost' ? (b.pctLost ?? 0) : (b.pctToGoal ?? 0)
     return bv - av
@@ -64,7 +75,7 @@ export default function Leaderboard({ allStats, prByParticipant }) {
   const totalWeighIns = allStats.reduce((s, st) => s + st.weighIns, 0)
   const totalLost = allStats.reduce((s, st) => s + Math.max(0, st.lost ?? 0), 0)
 
-  const medal = (i) => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1)
+  const medal = (i, stale) => stale ? '😴' : i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1)
 
   return (
     <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
@@ -94,7 +105,8 @@ export default function Leaderboard({ allStats, prByParticipant }) {
       <div className="flex flex-col">
         {rows.map((s, i) => {
           const p = s.participant
-          const isLead = i === 0
+          const stale = isStale(s)
+          const isLead = i === 0 && !stale
           const value = metric === 'lost' ? (s.pctLost ?? 0) : (s.pctToGoal ?? 0)
           const pct = Math.round(Math.max(0, value) * 100)
           const loggedToday = s.logs.some(l => l.date === today)
@@ -105,20 +117,21 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           const lastTwo = s.logs.slice(-2)
           const dailyDelta = lastTwo.length === 2 ? lastTwo[1].weight - lastTwo[0].weight : null
 
-          // Rank movement vs last completed week
+          // Rank movement vs last completed week — suppressed for stale rows since
+          // their position is driven by staleness, not real metric movement.
           const lastRank = lastWeekMap[p.id]
           const thisRank = i + 1
-          const movement = lastRank != null ? lastRank - thisRank : null // positive = moved up
+          const movement = (!stale && lastRank != null) ? lastRank - thisRank : null // positive = moved up
 
           return (
             <div
               key={p.id}
-              className={`relative flex items-center gap-3 px-4 ${isLead ? 'py-4 bg-gradient-to-r from-amber-300/10 to-transparent' : 'py-3 border-t border-slate-800/60'}`}
+              className={`relative flex items-center gap-3 px-4 ${isLead ? 'py-4 bg-gradient-to-r from-amber-300/10 to-transparent' : 'py-3 border-t border-slate-800/60'} ${stale ? 'opacity-60' : ''}`}
             >
               {isLead && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-300" />}
 
               <div className={`shrink-0 text-center font-extrabold text-slate-400 tabular-nums ${isLead ? 'w-7 text-xl' : 'w-5 text-sm'}`}>
-                {medal(i)}
+                {medal(i, stale)}
               </div>
 
               <div className="relative shrink-0">
@@ -137,10 +150,16 @@ export default function Leaderboard({ allStats, prByParticipant }) {
               <div className="flex-1 min-w-0">
                 <div className={`flex items-center gap-1.5 flex-wrap font-bold text-slate-100 ${isLead ? 'text-[15px]' : 'text-[13px]'}`}>
                   <span>{p.name}</span>
-                  {pr && <Chip tone="pr">🏆 PR</Chip>}
-                  {s.streak >= 1 && <Chip tone="streak">🔥 {s.streak}w</Chip>}
-                  {s.logStreak >= 2 && (
-                    <Chip tone={s.logStreakAtRisk ? 'logRisk' : 'log'}>🗓️ {s.logStreak}d{s.logStreakAtRisk ? '!' : ''}</Chip>
+                  {stale ? (
+                    <Chip tone="stale">😴 {s.daysSinceLastLog}d since log</Chip>
+                  ) : (
+                    <>
+                      {pr && <Chip tone="pr">🏆 PR</Chip>}
+                      {s.streak >= 1 && <Chip tone="streak">🔥 {s.streak}w</Chip>}
+                      {s.logStreak >= 2 && (
+                        <Chip tone={s.logStreakAtRisk ? 'logRisk' : 'log'}>🗓️ {s.logStreak}d{s.logStreakAtRisk ? '!' : ''}</Chip>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="text-[11px] text-slate-500 tabular-nums mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -149,9 +168,6 @@ export default function Leaderboard({ allStats, prByParticipant }) {
                     <span className={dailyDelta < 0 ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
                       {dailyDelta < 0 ? '▼' : '▲'}{Math.abs(dailyDelta).toFixed(1)} last log
                     </span>
-                  )}
-                  {missingToday && s.daysSinceLastLog > 1 && (
-                    <span className="text-slate-600 italic">· {s.daysSinceLastLog}d since log</span>
                   )}
                 </div>
               </div>
