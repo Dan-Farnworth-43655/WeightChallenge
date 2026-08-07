@@ -166,12 +166,6 @@ export default function App() {
             )}
           </div>
         </div>
-
-        {/* Verse footer */}
-        <div className="text-center mt-3 pt-2 border-t border-slate-800/60">
-          <p className="text-xs text-slate-500 whitespace-nowrap">⚔️ 🛡️ &nbsp;As iron sharpens iron, so one man sharpens another&nbsp; 🛡️ ⚔️</p>
-          <p className="text-[10px] text-slate-600">Proverbs 27:17</p>
-        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24">

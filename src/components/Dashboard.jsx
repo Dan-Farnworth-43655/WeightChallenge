@@ -8,6 +8,7 @@ import GoalEditor from './GoalEditor'
 import BadgeWall from './BadgeWall'
 import BadgeUnlockToast from './BadgeUnlockToast'
 import { BADGES, earnedBadges } from '../utils/badges'
+import Leaderboard from './Leaderboard'
 
 // Rotating verses — picked deterministically by day-of-year so the same verse
 // shows for the entire day across page reloads, but rotates each day.
@@ -26,90 +27,6 @@ function todaysVerse() {
   const start = new Date(now.getFullYear(), 0, 0)
   const dayOfYear = Math.floor((now - start) / 86400000)
   return VERSES[dayOfYear % VERSES.length]
-}
-
-function GroupWeeklyRecap({ allStats }) {
-  // Use any participant's recap to detect "it's Monday and someone has data"
-  const anyRecap = allStats.find(s => s.recap)?.recap
-  const [hidden, setHidden] = useState(() => {
-    try { return anyRecap && localStorage.getItem(anyRecap.dismissKey) === '1' } catch (e) { return false }
-  })
-  if (!anyRecap || hidden) return null
-
-  // Sort by delta ascending so biggest losers appear first (kindest reading)
-  const rows = [...allStats]
-    .filter(s => !s.participant.observer)
-    .sort((a, b) => {
-      const ad = a.recap ? a.recap.delta : Infinity
-      const bd = b.recap ? b.recap.delta : Infinity
-      return ad - bd
-    })
-
-  const dismiss = () => {
-    try { localStorage.setItem(anyRecap.dismissKey, '1') } catch (e) {}
-    setHidden(true)
-  }
-
-  return (
-    <div className="rounded-2xl border border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-slate-900 px-4 py-3">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-sky-300 font-bold">📅 Last week's recap</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">
-            How everyone did
-          </p>
-        </div>
-        <button
-          onClick={dismiss}
-          className="text-slate-500 hover:text-white text-lg leading-none px-2"
-          aria-label="Dismiss"
-        >
-          ✕
-        </button>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {rows.map(s => {
-          const p = s.participant
-          const r = s.recap
-          const lost   = r && r.delta != null && r.delta < -0.05
-          const gained = r && r.delta != null && r.delta >  0.05
-          const flat   = r && r.delta != null && Math.abs(r.delta) <= 0.05
-          return (
-            <div key={p.id} className="flex items-center justify-between text-sm py-1 gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0"
-                  style={{ backgroundColor: p.color + '33', color: p.color }}
-                >
-                  {p.initials}
-                </span>
-                <span className="text-slate-200 truncate">{p.name}</span>
-              </div>
-              {r ? (
-                <div className="flex items-baseline gap-2 tabular-nums shrink-0">
-                  <span className="text-[10px] text-slate-500">{r.count}/7d</span>
-                  <span className="text-slate-300 text-xs" title="Last week's average">
-                    {r.lastAvg.toFixed(1)}
-                  </span>
-                  {r.firstTrackedWeek ? (
-                    <span className="text-[10px] text-slate-500 italic">first week</span>
-                  ) : flat ? (
-                    <span className="font-bold text-slate-400 text-xs">flat</span>
-                  ) : lost ? (
-                    <span className="font-bold text-emerald-300 text-sm">{r.delta.toFixed(1)} 🎯</span>
-                  ) : gained ? (
-                    <span className="font-bold text-red-300 text-sm">+{r.delta.toFixed(1)}</span>
-                  ) : null}
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-500 italic shrink-0">no logs</span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 function Verse({ reference, text }) {
@@ -511,18 +428,6 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
   const recentPRs = prs.filter(pr => pr.date === today)
   const prByParticipant = Object.fromEntries(recentPRs.map(pr => [pr.participant, pr]))
 
-  // Achievement banners: PR today, or active weekly streak of 2+ weeks
-  // with a recent log (within the last 7 days — no stale weekly streaks)
-  const banners = []
-  for (const s of allStats) {
-    const pr = prByParticipant[s.participant.id]
-    const recentlyActive = s.daysSinceLastLog != null && s.daysSinceLastLog <= 7
-    const hasStreak = s.streak >= 2 && recentlyActive
-    if (pr || hasStreak) {
-      banners.push({ participant: s.participant, pr, streak: hasStreak ? s.streak : 0 })
-    }
-  }
-
   // Split the active user out of the ranked list so they go first
   const myStats     = allStats.find(s => s.participant.id === activeUser)
   const myLoggedToday = !!myStats?.logs?.some(l => l.date === today)
@@ -530,103 +435,15 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
 
   return (
     <div className="px-4 py-4 flex flex-col gap-6">
-      {/* Achievement banners — PRs and active loss streaks */}
-      {banners.map(({ participant: p, pr, streak }) => {
-        const both = pr && streak
-        const icon = pr ? '🏆' : '🔥'
-        const titleColor = pr ? 'text-amber-300' : 'text-orange-300'
-        const borderColor = pr ? 'border-amber-500/40 bg-amber-500/10' : 'border-orange-500/40 bg-orange-500/10'
-        return (
-          <div key={p.id} className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${borderColor}`}>
-            <span className="text-3xl">{icon}</span>
-            <div className="flex-1">
-              <p className={`text-sm font-bold ${titleColor}`}>
-                {both ? 'New PR + Hot Streak!' : pr ? 'New Personal Record!' : `${streak}-Week Loss Streak! 🔥`}
-              </p>
-              <p className="text-xs text-slate-300 mt-0.5">
-                <span className="font-semibold" style={{ color: p.color }}>{p.name}</span>
-                {pr && (
-                  <>
-                    {' '}hit a new low —{' '}
-                    <span className="font-bold text-white">{Number(pr.weight).toFixed(1)} lbs</span>
-                    {' '}on {formatDate(pr.date)}
-                  </>
-                )}
-                {pr && streak && (
-                  <>
-                    {' '}·{' '}
-                    <span className="font-bold text-orange-300">{streak} weeks</span> trending down 🔥
-                  </>
-                )}
-                {!pr && streak > 0 && (
-                  <>
-                    {' '}is on a{' '}
-                    <span className="font-bold text-orange-300">{streak}-week</span> downtrend. Don't break the chain! 🔥
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        )
-      })}
+      {/* Leaderboard — replaces the old banners + weekly recap + streaks scoreboard.
+          Ranked, chip-based, always-visible last-log delta and last-week movement. */}
+      {hasData && <Leaderboard allStats={allStats} prByParticipant={prByParticipant} />}
 
-      {/* Weekly recap banner — Mondays only, group-wide, dismissible */}
-      <GroupWeeklyRecap allStats={allStats} />
-
-      {/* Streaks scoreboard — everyone's logging + downtrend streaks at a glance */}
-      {hasData && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Streaks</h3>
-            <span className="text-[10px] text-slate-600">🗓️ days · 🔥 weeks</span>
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {ranked.map(s => {
-              const p = s.participant
-              return (
-                <div key={p.id} className="flex flex-col items-center gap-1.5 py-1">
-                  <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black"
-                    style={{ backgroundColor: p.color + '33', color: p.color }}
-                  >
-                    {p.initials}
-                  </span>
-                  <div className="flex flex-col items-center gap-0.5 leading-tight tabular-nums">
-                    <span
-                      className={`text-xs font-bold ${
-                        s.logStreak >= 2
-                          ? (s.logStreakAtRisk ? 'text-amber-300' : 'text-sky-300')
-                          : 'text-slate-700'
-                      }`}
-                      title={
-                        s.logStreak >= 2
-                          ? (s.logStreakAtRisk
-                              ? 'Streak at risk — log today!'
-                              : `${s.logStreak}-day logging streak`)
-                          : 'No logging streak yet'
-                      }
-                    >
-                      🗓️ {s.logStreak >= 2 ? `${s.logStreak}d${s.logStreakAtRisk ? '!' : ''}` : '—'}
-                    </span>
-                    <span
-                      className={`text-xs font-bold ${s.streak >= 1 ? 'text-orange-300' : 'text-slate-700'}`}
-                      title={s.streak >= 1 ? `${s.streak}-week downtrend` : 'No weekly downtrend streak'}
-                    >
-                      🔥 {s.streak >= 1 ? `${s.streak}w` : '—'}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Group progress table — top of the dashboard, the accountability anchor */}
+      {/* Detailed group progress table — the drill-into-the-numbers view, now secondary to the Leaderboard above */}
       {hasData && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
-            <h2 className="font-semibold text-sm text-slate-300">Group Progress</h2>
+            <h2 className="font-semibold text-sm text-slate-300">All the Numbers</h2>
             {/* Lifetime / Next Up toggle pill */}
             <div className="bg-slate-800 rounded-full p-0.5 flex text-[10px] uppercase tracking-wider font-bold">
               <button
@@ -751,17 +568,6 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
               })}
             </tbody>
           </table>
-          {/* Group totals — collective achievement footer */}
-          {(() => {
-            const totalWeighIns = allStats.reduce((s, st) => s + st.weighIns, 0)
-            const totalLost = allStats.reduce((s, st) => s + Math.max(0, st.lost ?? 0), 0)
-            return (totalWeighIns > 0 || totalLost > 0) ? (
-              <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/40 text-xs text-slate-400 flex items-center justify-between">
-                <span>Together: <span className="font-bold text-slate-200 tabular-nums">{totalLost.toFixed(1)} lbs</span> lost</span>
-                <span><span className="font-bold text-slate-200 tabular-nums">{totalWeighIns}</span> weigh-ins logged</span>
-              </div>
-            ) : null
-          })()}
         </div>
       )}
 
