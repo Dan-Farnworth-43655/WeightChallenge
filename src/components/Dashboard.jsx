@@ -404,7 +404,9 @@ function StatCard({ stats }) {
         <div className="mt-2 rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-xs flex items-center gap-2">
           <span className="text-base leading-none">📈</span>
           <div className="flex-1 leading-tight">
-            <div className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Week avg</div>
+            <div className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">
+              {weekOverWeek.isCurrentWeek ? 'Week avg (so far)' : 'Week avg (last completed)'}
+            </div>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-slate-400 tabular-nums">{weekOverWeek.lastAvg.toFixed(1)}</span>
               <span className="text-slate-500 text-[10px]">→</span>

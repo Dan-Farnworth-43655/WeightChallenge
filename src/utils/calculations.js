@@ -449,8 +449,11 @@ export function computeStats(participant, logs) {
   const dowAnalysis  = analyzeDayOfWeek(myLogs)
   const recap        = weeklyRecap(myLogs)
 
-  // Week-over-week comparison: this week's avg vs last week's avg.
-  // Calendar weeks (Mon-Sun). Null if either side has no logs.
+  // Week-over-week comparison: this week's avg vs last week's avg. Calendar
+  // weeks (Mon-Sun). If the CURRENT week has no logs yet (common — you might
+  // not have logged today), fall back one period so the card still shows:
+  // last completed week's avg vs the week before that (same pair the Monday
+  // recap uses). isCurrentWeek flags which pairing is being shown.
   let weekOverWeek = null
   if (myLogs.length > 0) {
     const todayDt = new Date(); todayDt.setHours(0, 0, 0, 0)
@@ -458,21 +461,39 @@ export function computeStats(participant, logs) {
     const thisMon = new Date(todayDt); thisMon.setDate(todayDt.getDate() - (dow === 0 ? 6 : dow - 1))
     const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7)
     const lastSun = new Date(thisMon); lastSun.setDate(thisMon.getDate() - 1)
-    const thisMonStr = thisMon.toISOString().split('T')[0]
-    const lastMonStr = lastMon.toISOString().split('T')[0]
-    const lastSunStr = lastSun.toISOString().split('T')[0]
+    const priorMon = new Date(lastMon); priorMon.setDate(lastMon.getDate() - 7)
+    const priorSun = new Date(lastMon); priorSun.setDate(lastMon.getDate() - 1)
+    const fmt = d => d.toISOString().split('T')[0]
+    const thisMonStr = fmt(thisMon)
+    const lastMonStr = fmt(lastMon)
+    const lastSunStr = fmt(lastSun)
+    const priorMonStr = fmt(priorMon)
+    const priorSunStr = fmt(priorSun)
 
     const thisWeek = myLogs.filter(l => l.date >= thisMonStr)
     const lastWeek = myLogs.filter(l => l.date >= lastMonStr && l.date <= lastSunStr)
+    const priorWeek = myLogs.filter(l => l.date >= priorMonStr && l.date <= priorSunStr)
+
+    const avgOf = arr => arr.reduce((s, l) => s + l.weight, 0) / arr.length
+
     if (thisWeek.length > 0 && lastWeek.length > 0) {
-      const thisAvg = thisWeek.reduce((s, l) => s + l.weight, 0) / thisWeek.length
-      const lastAvg = lastWeek.reduce((s, l) => s + l.weight, 0) / lastWeek.length
       weekOverWeek = {
-        thisAvg,
-        lastAvg,
-        delta: thisAvg - lastAvg,
+        thisAvg: avgOf(thisWeek),
+        lastAvg: avgOf(lastWeek),
+        delta: avgOf(thisWeek) - avgOf(lastWeek),
         thisCount: thisWeek.length,
         lastCount: lastWeek.length,
+        isCurrentWeek: true,
+      }
+    } else if (lastWeek.length > 0 && priorWeek.length > 0) {
+      // Fallback: current week has no logs yet — show the last completed pair
+      weekOverWeek = {
+        thisAvg: avgOf(lastWeek),
+        lastAvg: avgOf(priorWeek),
+        delta: avgOf(lastWeek) - avgOf(priorWeek),
+        thisCount: lastWeek.length,
+        lastCount: priorWeek.length,
+        isCurrentWeek: false,
       }
     }
   }
