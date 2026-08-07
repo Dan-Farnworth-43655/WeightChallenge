@@ -63,7 +63,7 @@ export default function WeightChart({ logs, participants }) {
             name={p.id}
             stroke={p.color}
             strokeWidth={2}
-            dot={{ fill: p.color, r: 4 }}
+            dot={false}
             connectNulls
             activeDot={{ r: 6 }}
           />
