@@ -3,14 +3,18 @@ import {
 } from 'recharts'
 import { formatDate } from '../utils/calculations'
 
-function buildChartData(logs, participants) {
+function buildChartData(logs, participants, rawLogs) {
   const dateSet = new Set(logs.map(l => l.date))
   const dates = [...dateSet].sort()
 
-  // Per-participant baseline = their absolute first log (lifetime view)
+  // Per-participant baseline = their absolute first RAW log (lifetime view).
+  // Always derived from unaggregated logs so switching to Weekly/Monthly
+  // granularity never shifts the baseline to a bucket average — it stays
+  // anchored to the actual first datapoint, matching the stat card's "Lost".
+  const baselineSource = rawLogs ?? logs
   const effectiveStart = {}
   for (const p of participants) {
-    const first = logs.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
+    const first = baselineSource.filter(l => l.participant === p.id).sort((a, b) => a.date.localeCompare(b.date))[0]
     effectiveStart[p.id] = first ? first.weight : null
   }
 
@@ -42,8 +46,8 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function LbsLostChart({ logs, participants }) {
-  const data = buildChartData(logs, participants)
+export default function LbsLostChart({ logs, participants, rawLogs }) {
+  const data = buildChartData(logs, participants, rawLogs)
   if (data.length === 0) return <p className="text-slate-500 text-sm text-center py-4">No data yet</p>
 
   return (

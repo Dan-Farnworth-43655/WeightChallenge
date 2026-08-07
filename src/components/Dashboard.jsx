@@ -885,11 +885,11 @@ export default function Dashboard({ ranked, allStats, logs, prs = [], activeUser
           </div>
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
             <h2 className="font-semibold text-sm text-slate-300 mb-4">Total Lbs Lost</h2>
-            <LbsLostChart logs={chartLogs} participants={PARTICIPANTS} />
+            <LbsLostChart logs={chartLogs} rawLogs={logs} participants={PARTICIPANTS} />
           </div>
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
             <h2 className="font-semibold text-sm text-slate-300 mb-4">Cumulative % Lost</h2>
-            <PctLostChart logs={chartLogs} participants={PARTICIPANTS} />
+            <PctLostChart logs={chartLogs} rawLogs={logs} participants={PARTICIPANTS} />
           </div>
         </>
       )}
