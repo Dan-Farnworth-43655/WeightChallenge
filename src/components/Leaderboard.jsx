@@ -65,13 +65,24 @@ function Chip({ tone, children }) {
   )
 }
 
+// Bump this to reset everyone's saved tab back to the current default — people
+// who already had a preference stored from before "Next Goal" existed would
+// otherwise never see the new default, since it only fills in when nothing's saved.
+const METRIC_DEFAULT_VERSION = '2'
+
 export default function Leaderboard({ allStats, prByParticipant }) {
   const [metric, setMetric] = useState(() => {
-    try { return localStorage.getItem('leaderboardMetric') || 'nextgoal' } catch (e) { return 'nextgoal' }
+    try {
+      if (localStorage.getItem('leaderboardMetricVersion') !== METRIC_DEFAULT_VERSION) return 'nextgoal'
+      return localStorage.getItem('leaderboardMetric') || 'nextgoal'
+    } catch (e) { return 'nextgoal' }
   })
   const setAndSaveMetric = (m) => {
     setMetric(m)
-    try { localStorage.setItem('leaderboardMetric', m) } catch (e) {}
+    try {
+      localStorage.setItem('leaderboardMetric', m)
+      localStorage.setItem('leaderboardMetricVersion', METRIC_DEFAULT_VERSION)
+    } catch (e) {}
   }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
@@ -143,6 +154,15 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           const isLead = i === 0 && !stale
           const nextGoalTarget = NEXT_GOAL.weights[p.id] ?? null
           const nextGoalRemaining = (nextGoalTarget != null && s.current != null) ? s.current - nextGoalTarget : null
+
+          // Where the 21-day trend (same regression powering the trend chart) says
+          // they'll actually be on the checkpoint date, not just where they are today.
+          let projectedNextGoal = null
+          if (s.regressionPace != null && s.current != null && s.logs.length > 0) {
+            const windowLast = new Date(s.logs[s.logs.length - 1].date + 'T00:00:00')
+            const daysToNextGoal = (new Date(NEXT_GOAL.date + 'T00:00:00') - windowLast) / 86400000
+            projectedNextGoal = parseFloat((s.current - s.regressionPace * daysToNextGoal).toFixed(1))
+          }
           const value = metric === 'lost' ? (s.pctLost ?? 0) : (s.pctToGoal ?? 0)
           const pct = Math.round(Math.max(0, value) * 100)
           const loggedToday = s.logs.some(l => l.date === today)
@@ -206,6 +226,11 @@ export default function Leaderboard({ allStats, prByParticipant }) {
                     </span>
                   )}
                 </div>
+                {projectedNextGoal != null && (
+                  <div className={`text-[9px] tabular-nums mt-0.5 ${nextGoalTarget != null && projectedNextGoal <= nextGoalTarget ? 'text-emerald-500/80' : 'text-slate-600'}`}>
+                    trending to {projectedNextGoal.toFixed(1)} lbs by {formatDate(NEXT_GOAL.date)}
+                  </div>
+                )}
               </div>
 
               <div className="text-right shrink-0 min-w-[52px]">

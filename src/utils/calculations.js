@@ -517,6 +517,7 @@ export function computeStats(participant, logs) {
     pace,
     projectedFinish,
     projectedGoalDateWeight,
+    regressionPace,
     regressionData,
     streak,
     prevBestStreak,
