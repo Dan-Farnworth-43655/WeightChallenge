@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { computeStats } from '../utils/calculations'
+import { computeStats, formatDate } from '../utils/calculations'
+
+// Shared mid-point checkpoint: everyone has the same due date but their own
+// target weight. Tracked here (not in PARTICIPANTS) since it's a one-off
+// sprint goal rather than a permanent milestone.
+const NEXT_GOAL = {
+  date: '2026-09-10',
+  weights: { dan: 187, paul: 207, javin: 197, josh: 197 },
+}
 
 // Date string for the Sunday that ended the last fully-completed calendar week.
 function lastCompletedSunday() {
@@ -20,7 +28,13 @@ function lastWeekRanks(allStats, metric) {
     const truncated = s.logs.filter(l => l.date <= cutoff)
     if (truncated.length === 0) return { id: s.participant.id, value: null }
     const snap = computeStats(s.participant, truncated)
-    return { id: s.participant.id, value: metric === 'lost' ? snap.pctLost : snap.pctToGoal }
+    let value
+    if (metric === 'lost') value = snap.pctLost
+    else if (metric === 'nextgoal') {
+      const target = NEXT_GOAL.weights[s.participant.id]
+      value = (target != null && snap.current != null) ? target - snap.current : null
+    } else value = snap.pctToGoal
+    return { id: s.participant.id, value }
   })
   const ranked = snapshots.filter(s => s.value != null).sort((a, b) => b.value - a.value)
   const map = {}
@@ -53,7 +67,7 @@ function Chip({ tone, children }) {
 
 export default function Leaderboard({ allStats, prByParticipant }) {
   const [metric, setMetric] = useState(() => {
-    try { return localStorage.getItem('leaderboardMetric') || 'goal' } catch (e) { return 'goal' }
+    try { return localStorage.getItem('leaderboardMetric') || 'nextgoal' } catch (e) { return 'nextgoal' }
   })
   const setAndSaveMetric = (m) => {
     setMetric(m)
@@ -62,12 +76,22 @@ export default function Leaderboard({ allStats, prByParticipant }) {
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
 
+  // Rank value where HIGHER always means better placement, regardless of metric:
+  // % metrics are already higher-is-better; for the lbs-to-next-goal checkpoint,
+  // "target minus current" turns being under the target weight into a positive value.
+  const rankValue = (s) => {
+    if (metric === 'lost') return s.pctLost ?? 0
+    if (metric === 'nextgoal') {
+      const target = NEXT_GOAL.weights[s.participant.id]
+      return (target != null && s.current != null) ? target - s.current : -Infinity
+    }
+    return s.pctToGoal ?? 0
+  }
+
   const rows = [...allStats].sort((a, b) => {
     const aStale = isStale(a), bStale = isStale(b)
     if (aStale !== bStale) return aStale ? 1 : -1 // stale always sinks below active loggers
-    const av = metric === 'lost' ? (a.pctLost ?? 0) : (a.pctToGoal ?? 0)
-    const bv = metric === 'lost' ? (b.pctLost ?? 0) : (b.pctToGoal ?? 0)
-    return bv - av
+    return rankValue(b) - rankValue(a)
   })
 
   const lastWeekMap = lastWeekRanks(allStats, metric)
@@ -83,10 +107,20 @@ export default function Leaderboard({ allStats, prByParticipant }) {
         <div>
           <h2 className="font-semibold text-sm text-slate-200 flex items-center gap-1.5">🏆 Leaderboard</h2>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            {metric === 'lost' ? 'Ranked by lifetime % lost' : 'Ranked by % to goal — fair across different starting weights'}
+            {metric === 'lost'
+              ? 'Ranked by lifetime % lost'
+              : metric === 'nextgoal'
+                ? `Ranked by lbs from each person's ${formatDate(NEXT_GOAL.date)} goal`
+                : 'Ranked by % to goal — fair across different starting weights'}
           </p>
         </div>
         <div className="bg-slate-800 rounded-full p-0.5 flex text-[10px] uppercase tracking-wider font-bold shrink-0">
+          <button
+            onClick={() => setAndSaveMetric('nextgoal')}
+            className={`px-2.5 py-1 rounded-full transition-colors ${metric === 'nextgoal' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Next Goal
+          </button>
           <button
             onClick={() => setAndSaveMetric('goal')}
             className={`px-2.5 py-1 rounded-full transition-colors ${metric === 'goal' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
@@ -107,6 +141,8 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           const p = s.participant
           const stale = isStale(s)
           const isLead = i === 0 && !stale
+          const nextGoalTarget = NEXT_GOAL.weights[p.id] ?? null
+          const nextGoalRemaining = (nextGoalTarget != null && s.current != null) ? s.current - nextGoalTarget : null
           const value = metric === 'lost' ? (s.pctLost ?? 0) : (s.pctToGoal ?? 0)
           const pct = Math.round(Math.max(0, value) * 100)
           const loggedToday = s.logs.some(l => l.date === today)
@@ -173,12 +209,25 @@ export default function Leaderboard({ allStats, prByParticipant }) {
               </div>
 
               <div className="text-right shrink-0 min-w-[52px]">
-                <div className={`font-extrabold tabular-nums ${isLead ? 'text-2xl' : 'text-lg'}`} style={{ color: p.color }}>
-                  {pct}%
-                </div>
-                <div className="text-[8px] uppercase tracking-wide text-slate-500">
-                  {metric === 'lost' ? 'lost' : 'to goal'}
-                </div>
+                {metric === 'nextgoal' ? (
+                  <>
+                    <div className={`font-extrabold tabular-nums ${isLead ? 'text-2xl' : 'text-lg'}`} style={{ color: p.color }}>
+                      {nextGoalRemaining == null ? '—' : nextGoalRemaining <= 0 ? '✓' : nextGoalRemaining.toFixed(1)}
+                    </div>
+                    <div className="text-[8px] uppercase tracking-wide text-slate-500">
+                      {nextGoalRemaining != null && nextGoalRemaining <= 0 ? 'goal hit' : 'lbs to go'}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={`font-extrabold tabular-nums ${isLead ? 'text-2xl' : 'text-lg'}`} style={{ color: p.color }}>
+                      {pct}%
+                    </div>
+                    <div className="text-[8px] uppercase tracking-wide text-slate-500">
+                      {metric === 'lost' ? 'lost' : 'to goal'}
+                    </div>
+                  </>
+                )}
                 {movement != null && movement !== 0 && (
                   <div className={`text-[10px] font-bold tabular-nums mt-0.5 ${movement > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {movement > 0 ? '▲' : '▼'}{Math.abs(movement)}
