@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { computeStats, formatDate } from '../utils/calculations'
 
-// Shared mid-point checkpoint: everyone has the same due date but their own
-// target weight. Tracked here (not in PARTICIPANTS) since it's a one-off
-// sprint goal rather than a permanent milestone.
-const NEXT_GOAL = {
-  date: '2026-09-10',
-  weights: { dan: 187, paul: 207, javin: 197, josh: 197 },
+// Each person's next checkpoint: their next un-hit milestone, or their final
+// goal once milestones run out. Read live off computeStats (which already
+// folds in Redis goal-editor overrides) so this never goes stale the way a
+// hardcoded snapshot would the moment someone edits their own milestone.
+function nextCheckpoint(s) {
+  if (s.nextMilestone) return { weight: s.nextMilestone.weight, date: s.nextMilestone.date }
+  if (s.goal != null) return { weight: s.goal, date: s.goalDate }
+  return null
 }
 
 // Date string for the Sunday that ended the last fully-completed calendar week.
@@ -31,8 +33,8 @@ function lastWeekRanks(allStats, metric) {
     let value
     if (metric === 'lost') value = snap.pctLost
     else if (metric === 'nextgoal') {
-      const target = NEXT_GOAL.weights[s.participant.id]
-      value = (target != null && snap.current != null) ? target - snap.current : null
+      const cp = nextCheckpoint(snap)
+      value = (cp != null && snap.current != null) ? cp.weight - snap.current : null
     } else value = snap.pctToGoal
     return { id: s.participant.id, value }
   })
@@ -93,8 +95,8 @@ export default function Leaderboard({ allStats, prByParticipant }) {
   const rankValue = (s) => {
     if (metric === 'lost') return s.pctLost ?? 0
     if (metric === 'nextgoal') {
-      const target = NEXT_GOAL.weights[s.participant.id]
-      return (target != null && s.current != null) ? target - s.current : -Infinity
+      const cp = nextCheckpoint(s)
+      return (cp != null && s.current != null) ? cp.weight - s.current : -Infinity
     }
     return s.pctToGoal ?? 0
   }
@@ -121,7 +123,7 @@ export default function Leaderboard({ allStats, prByParticipant }) {
             {metric === 'lost'
               ? 'Ranked by lifetime % lost'
               : metric === 'nextgoal'
-                ? `Ranked by lbs from each person's ${formatDate(NEXT_GOAL.date)} goal`
+                ? "Ranked by lbs from each person's next milestone"
                 : 'Ranked by % to goal — fair across different starting weights'}
           </p>
         </div>
@@ -152,15 +154,16 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           const p = s.participant
           const stale = isStale(s)
           const isLead = i === 0 && !stale
-          const nextGoalTarget = NEXT_GOAL.weights[p.id] ?? null
+          const checkpoint = nextCheckpoint(s)
+          const nextGoalTarget = checkpoint?.weight ?? null
           const nextGoalRemaining = (nextGoalTarget != null && s.current != null) ? s.current - nextGoalTarget : null
 
           // Where the 21-day trend (same regression powering the trend chart) says
           // they'll actually be on the checkpoint date, not just where they are today.
           let projectedNextGoal = null
-          if (s.regressionPace != null && s.current != null && s.logs.length > 0) {
+          if (s.regressionPace != null && s.current != null && s.logs.length > 0 && checkpoint?.date) {
             const windowLast = new Date(s.logs[s.logs.length - 1].date + 'T00:00:00')
-            const daysToNextGoal = (new Date(NEXT_GOAL.date + 'T00:00:00') - windowLast) / 86400000
+            const daysToNextGoal = (checkpoint.date - windowLast) / 86400000
             projectedNextGoal = parseFloat((s.current - s.regressionPace * daysToNextGoal).toFixed(1))
           }
           const value = metric === 'lost' ? (s.pctLost ?? 0) : (s.pctToGoal ?? 0)
@@ -228,7 +231,7 @@ export default function Leaderboard({ allStats, prByParticipant }) {
                 </div>
                 {projectedNextGoal != null && (
                   <div className={`text-[9px] tabular-nums mt-0.5 ${nextGoalTarget != null && projectedNextGoal <= nextGoalTarget ? 'text-emerald-500/80' : 'text-slate-600'}`}>
-                    trending to {projectedNextGoal.toFixed(1)} lbs by {formatDate(NEXT_GOAL.date)}
+                    trending to {projectedNextGoal.toFixed(1)} lbs by {formatDate(checkpoint.date)}
                   </div>
                 )}
               </div>
@@ -242,6 +245,9 @@ export default function Leaderboard({ allStats, prByParticipant }) {
                     <div className="text-[8px] uppercase tracking-wide text-slate-500">
                       {nextGoalRemaining != null && nextGoalRemaining <= 0 ? 'goal hit' : 'lbs to go'}
                     </div>
+                    {checkpoint?.date && (
+                      <div className="text-[8px] text-slate-600">by {formatDate(checkpoint.date)}</div>
+                    )}
                   </>
                 ) : (
                   <>
