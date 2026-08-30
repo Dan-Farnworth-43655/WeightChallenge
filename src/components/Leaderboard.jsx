@@ -11,6 +11,19 @@ function nextCheckpoint(s) {
   return null
 }
 
+// Horse-race position: progress from lifetime starting weight toward the
+// checkpoint target, normalized 0–1 so people starting at very different
+// weights race fairly against each other (same shape as pctToGoal, just
+// aimed at the checkpoint instead of the final goal).
+function checkpointProgress(s) {
+  const cp = nextCheckpoint(s)
+  if (!cp || s.effectiveStart == null || s.current == null) return null
+  const span = s.effectiveStart - cp.weight
+  const pct = span > 0 ? Math.max(0, Math.min(1, (s.effectiveStart - s.current) / span)) : 1
+  const remaining = Math.max(0, s.current - cp.weight)
+  return { pct, remaining, target: cp.weight }
+}
+
 // Date string for the Sunday that ended the last fully-completed calendar week.
 function lastCompletedSunday() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -146,6 +159,52 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           >
             Lost
           </button>
+        </div>
+      </div>
+
+      {/* Horse race — single shared track, positioned by normalized progress
+          toward each person's own next checkpoint, with actual lbs-to-go below. */}
+      <div className="px-4 pt-3 pb-3 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+            <span>🏁</span> Race to the Next Goal
+          </h3>
+          <span className="text-[9px] uppercase tracking-wider text-slate-500">Closest to target wins</span>
+        </div>
+        <div className="relative h-9 bg-slate-800/60 rounded-md overflow-visible">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-slate-700" />
+          {allStats.map((s, i) => {
+            const race = checkpointProgress(s)
+            if (!race) return null
+            const hasWon = race.remaining <= 0
+            const offsetY = (i - (allStats.length - 1) / 2) * 9
+            return (
+              <div
+                key={s.participant.id}
+                className="absolute top-1/2 transition-all duration-500"
+                style={{ left: `calc(${race.pct * 100}% - 10px)`, transform: `translateY(calc(-50% + ${offsetY}px))` }}
+                title={`${s.participant.name}: ${hasWon ? 'goal hit!' : `${race.remaining.toFixed(1)} lbs to go`}`}
+              >
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] shadow-lg border-2 border-white/80"
+                  style={{ backgroundColor: s.participant.color }}
+                >
+                  {hasWon ? '👑' : <span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🐎</span>}
+                </div>
+              </div>
+            )
+          })}
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 text-sm leading-none pointer-events-none">🏁</div>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-[10px] tabular-nums">
+          {allStats.map(s => {
+            const race = checkpointProgress(s)
+            return (
+              <span key={s.participant.id} className="font-bold" style={{ color: s.participant.color }}>
+                {s.participant.initials} {race == null ? '—' : race.remaining <= 0 ? '✓' : `${race.remaining.toFixed(1)} lbs`}
+              </span>
+            )
+          })}
         </div>
       </div>
 
