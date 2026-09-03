@@ -11,14 +11,16 @@ function nextCheckpoint(s) {
   return null
 }
 
-// Raw lbs remaining to each person's checkpoint. Deliberately NOT normalized
-// against each person's own starting weight — two people with the same lbs
-// left should sit neck-and-neck on the track, not be spread apart because
-// one of them started further away.
+// Each person's existing next goal is the finish, and 8 lbs above that goal is
+// the starting gate. Placement never depends on the last-place racer.
+const RACE_DISTANCE_LBS = 8
+
 function checkpointProgress(s) {
   const cp = nextCheckpoint(s)
   if (!cp || s.current == null) return null
-  return { remaining: Math.max(0, s.current - cp.weight), target: cp.weight }
+  const remaining = Math.max(0, s.current - cp.weight)
+  const pct = Math.max(0, Math.min(1, 1 - remaining / RACE_DISTANCE_LBS))
+  return { remaining, target: cp.weight, pct }
 }
 
 // Date string for the Sunday that ended the last fully-completed calendar week.
@@ -159,14 +161,12 @@ export default function Leaderboard({ allStats, prByParticipant }) {
         </div>
       </div>
 
-      {/* Horse race — single shared track. Position is raw lbs-remaining scaled
-          against the farthest-out racer, NOT normalized per-person, so two
-          people with the same lbs to go land at the same spot on the track. */}
+      {/* Horse race — each finish is the person's next goal; the course starts
+          8 lbs above it so everyone is measured on the same scale. */}
       {(() => {
         const races = allStats
           .map(s => ({ s, race: checkpointProgress(s) }))
           .filter(r => r.race != null)
-        const maxRemaining = Math.max(1, ...races.map(r => r.race.remaining))
         return (
           <div className="px-4 pt-3 pb-3 border-b border-slate-800">
             <div className="flex items-center justify-between mb-2">
@@ -175,29 +175,47 @@ export default function Leaderboard({ allStats, prByParticipant }) {
               </h3>
               <span className="text-[9px] uppercase tracking-wider text-slate-500">Closest to target wins</span>
             </div>
-            <div className="relative h-9 bg-slate-800/60 rounded-md overflow-visible">
-              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-slate-700" />
-              {races.map(({ s, race }, i) => {
+            <div className="space-y-1.5">
+              {races.map(({ s, race }) => {
                 const hasWon = race.remaining <= 0
-                const pct = hasWon ? 1 : 1 - race.remaining / maxRemaining
-                const offsetY = (i - (races.length - 1) / 2) * 9
                 return (
                   <div
                     key={s.participant.id}
-                    className="absolute top-1/2 transition-all duration-500"
-                    style={{ left: `calc(${pct * 100}% - 10px)`, transform: `translateY(calc(-50% + ${offsetY}px))` }}
+                    className="flex items-center gap-2"
                     title={`${s.participant.name}: ${hasWon ? 'goal hit!' : `${race.remaining.toFixed(1)} lbs to go`}`}
                   >
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] shadow-lg border-2 border-white/80"
-                      style={{ backgroundColor: s.participant.color }}
+                    <span
+                      className="w-10 shrink-0 truncate text-[10px] font-bold text-right"
+                      style={{ color: s.participant.color }}
                     >
-                      {hasWon ? '👑' : <span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🐎</span>}
+                      {s.participant.name}
+                    </span>
+                    <div className="relative h-8 flex-1 rounded-full border border-slate-700 bg-slate-800/80 overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full opacity-20 transition-all duration-500"
+                        style={{ width: `${race.pct * 100}%`, backgroundColor: s.participant.color }}
+                      />
+                      {[25, 50, 75].map(mark => (
+                        <span
+                          key={mark}
+                          className="absolute inset-y-1 border-l border-dashed border-slate-600/60"
+                          style={{ left: `${mark}%` }}
+                        />
+                      ))}
+                      <div className="absolute inset-y-0 right-0 w-3 border-l border-white/30 bg-[repeating-conic-gradient(#fff_0_25%,#334155_0_50%)] bg-[length:8px_8px] opacity-70" />
+                      <div
+                        className="absolute top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 text-xs shadow-lg transition-all duration-500"
+                        style={{ left: `calc(${race.pct * 100}% - ${race.pct * 24}px)`, backgroundColor: s.participant.color }}
+                      >
+                        {hasWon ? '👑' : <span className="inline-block -scale-x-100">🐎</span>}
+                      </div>
                     </div>
+                    <span className="w-12 shrink-0 text-right text-[9px] tabular-nums text-slate-500">
+                      {hasWon ? 'Finished' : `${race.remaining.toFixed(1)} left`}
+                    </span>
                   </div>
                 )
               })}
-              <div className="absolute right-1 top-1/2 -translate-y-1/2 text-sm leading-none pointer-events-none">🏁</div>
             </div>
           </div>
         )
