@@ -9,6 +9,10 @@ export const RECOVERED_MILESTONES = {
 
 export const milestoneKey = m => `${m.weight}|${m.date ?? ''}`
 
+// Original launch configuration (commit 5d8dec6). Josh joined later and
+// was not a participant in the original 8%-in-8-weeks challenge.
+export const ORIGINAL_CHALLENGE_START_WEIGHTS = { javin: 214.2, dan: 198.3, paul: 233.4 }
+
 export function archiveMilestones(previous, nextMilestones, retiredAt) {
   const activeKeys = new Set(nextMilestones.map(milestoneKey))
   const history = new Map((previous.milestoneHistory ?? []).map(m => [milestoneKey(m), m]))
@@ -30,5 +34,18 @@ export function milestoneAchievements(participant, logs) {
       byWeight.set(m.weight, { weight: m.weight, hitDate: hit.date, actualWeight: hit.weight })
     }
   }
-  return [...byWeight.values()].sort((a, b) => a.hitDate.localeCompare(b.hitDate) || b.weight - a.weight)
+  const achievements = [...byWeight.values()]
+  const originalStart = ORIGINAL_CHALLENGE_START_WEIGHTS[participant.id]
+  if (originalStart != null) {
+    // Compare against the exact 8% threshold, rounding only the display.
+    const weight = originalStart * 0.92
+    const hit = logs.find(l => l.date >= '2026-04-01' && l.weight <= weight)
+    if (hit) achievements.push({
+      weight,
+      hitDate: hit.date,
+      actualWeight: hit.weight,
+      label: '8% in 8 weeks',
+    })
+  }
+  return achievements.sort((a, b) => a.hitDate.localeCompare(b.hitDate) || b.weight - a.weight)
 }

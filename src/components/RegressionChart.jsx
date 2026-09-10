@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload }) => {
         <p className="font-semibold text-white">Actual: {actual.toFixed(1)} lbs</p>
       )}
       {point.achievements?.map(m => (
-        <p key={m.weight} className="font-semibold text-emerald-300">✓ {m.weight} lbs milestone achieved</p>
+        <p key={m.label ?? m.weight} className="font-semibold text-emerald-300">✓ {m.label ? `${m.label} (${m.weight.toFixed(1)} lbs)` : `${m.weight} lbs milestone`} achieved</p>
       ))}
       {pace != null && (
         <p className={isFuture ? 'font-semibold text-white' : 'text-slate-400'}>
@@ -263,8 +263,8 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
     {achievements.length > 0 ? (
       <div className="mt-3 flex flex-wrap gap-2" aria-label="Achieved milestones">
         {achievements.map(m => (
-          <span key={m.weight} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">
-            <span className="font-bold">✓ {m.weight} lbs</span> · {formatDate(m.hitDate)}
+          <span key={m.label ?? m.weight} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">
+            <span className="font-bold">✓ {m.label ? `${m.label} · ${m.weight.toFixed(1)} lbs` : `${m.weight} lbs`}</span> · {formatDate(m.hitDate)}
           </span>
         ))}
       </div>

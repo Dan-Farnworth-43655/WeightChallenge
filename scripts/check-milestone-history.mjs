@@ -24,3 +24,16 @@ assert.equal(milestoneAchievements({ ...p, milestones: [old, next] }, logs).leng
 // Recovered September checkpoint remains available after the November reset.
 assert.ok(milestoneAchievements({ id: 'dan', milestones: [] }, [{ date: '2026-09-09', weight: 182.8 }]).some(m => m.weight === 182.8))
 console.log('Milestone recovery, archive preservation, bounce-back, retirement cutoff, deduplication, and active target checks passed.')
+
+for (const [id, start] of Object.entries({ javin: 214.2, dan: 198.3, paul: 233.4 })) {
+  const threshold = start * 0.92
+  const achievements = milestoneAchievements({ id }, [
+    { date: '2026-03-30', weight: threshold - 1 },
+    { date: '2026-05-01', weight: threshold + 0.01 },
+    { date: '2026-05-20', weight: threshold - 0.01 },
+    { date: '2026-09-10', weight: start },
+  ])
+  assert.equal(achievements.find(m => m.label === '8% in 8 weeks').hitDate, '2026-05-20')
+}
+assert.ok(!milestoneAchievements({ id: 'josh' }, [{ date: '2026-05-20', weight: 170 }]).some(m => m.label))
+console.log('Original 8% challenge: all three founders, exact threshold, start date, bounce-back, and Josh exclusion passed.')
