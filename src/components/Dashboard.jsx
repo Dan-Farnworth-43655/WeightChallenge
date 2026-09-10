@@ -360,7 +360,7 @@ function StatCardWithRegression({ stats }) {
       <StatCard stats={stats} />
       {stats.regressionData && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-          <p className="text-xs text-slate-500 mb-3">21-day regression trend</p>
+          <p className="text-xs text-slate-500 mb-3">60-day regression trend</p>
           <RegressionChart
             regressionData={stats.regressionData}
             color={stats.participant.color}

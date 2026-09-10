@@ -144,7 +144,7 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
   // X axis ticks
   const ticks = [0, Math.round(days / 3), Math.round(days * 2 / 3), days]
 
-  // Custom dot for actual weigh-ins: bright if in 21-day window, dim if older
+  // Custom dot for actual weigh-ins: bright if in 60-day window, dim if older
   const ActualDot = (props) => {
     const { cx, cy, payload } = props
     if (payload.actual == null) return null

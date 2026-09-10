@@ -229,8 +229,11 @@ export default function Leaderboard({ allStats, prByParticipant }) {
           const checkpoint = nextCheckpoint(s)
           const nextGoalTarget = checkpoint?.weight ?? null
           const nextGoalRemaining = (nextGoalTarget != null && s.current != null) ? s.current - nextGoalTarget : null
+          const nextGoalPercentRemaining = nextGoalRemaining != null && s.current > 0
+            ? Math.max(0, nextGoalRemaining) / s.current * 100
+            : null
 
-          // Where the 21-day trend (same regression powering the trend chart) says
+          // Where the 60-day trend (same regression powering the trend chart) says
           // they'll actually be on the checkpoint date, not just where they are today.
           let projectedNextGoal = null
           if (s.regressionPace != null && s.current != null && s.logs.length > 0 && checkpoint?.date) {
@@ -317,6 +320,14 @@ export default function Leaderboard({ allStats, prByParticipant }) {
                     <div className="text-[8px] uppercase tracking-wide text-slate-500">
                       {nextGoalRemaining != null && nextGoalRemaining <= 0 ? 'goal hit' : 'lbs to go'}
                     </div>
+                    {nextGoalPercentRemaining != null && (
+                      <div
+                        className="text-[10px] tabular-nums text-slate-400 mt-0.5"
+                        title="Pounds remaining divided by current body weight"
+                      >
+                        {nextGoalPercentRemaining.toFixed(1)}% to lose
+                      </div>
+                    )}
                     {checkpoint?.date && (
                       <div className="text-[8px] text-slate-600">by {formatDate(checkpoint.date)}</div>
                     )}

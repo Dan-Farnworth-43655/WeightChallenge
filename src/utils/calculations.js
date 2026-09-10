@@ -372,8 +372,8 @@ export function computeStats(participant, logs) {
     pace = lost / daysElapsed
   }
 
-  // 21-day rolling least-squares regression for projections (requires 7+ weigh-ins)
-  const ROLLING_DAYS = 21
+  // 60-day rolling least-squares regression for projections (requires 7+ weigh-ins)
+  const ROLLING_DAYS = 60
   const MIN_WEIGH_INS = 7
   let regressionPace = null
   let projectedFinish = null      // Projected DATE of hitting goal
