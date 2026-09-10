@@ -1,3 +1,5 @@
+import { milestoneAchievements } from './milestoneHistory.js'
+
 // Participant configuration — each person has their own goal and milestones.
 // Goals: { weight, date }. Milestones: array of { weight, date } (date optional).
 // Milestones should be ordered from highest weight to lowest (i.e. earliest to latest in the journey).
@@ -108,6 +110,7 @@ export function applyGoalOverride(participant, overrides) {
     ...participant,
     goal:       override.goal ?? participant.goal,
     milestones: Array.isArray(override.milestones) ? override.milestones : participant.milestones,
+    milestoneHistory: override.milestoneHistory ?? participant.milestoneHistory ?? [],
   }
 }
 
@@ -513,6 +516,7 @@ export function computeStats(participant, logs) {
     daysToGoalDate,
     paceNeeded,
     milestones,
+    milestoneAchievements: milestoneAchievements(participant, myLogs),
     nextMilestone,
     pace,
     projectedFinish,

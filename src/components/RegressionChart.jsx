@@ -4,6 +4,10 @@ import {
 } from 'recharts'
 import { formatDate } from '../utils/calculations'
 
+const dayMs = date => typeof date === 'string'
+  ? Date.parse(date.slice(0, 10) + 'T00:00:00Z')
+  : Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
 
@@ -25,6 +29,9 @@ const CustomTooltip = ({ active, payload }) => {
       {actual != null && (
         <p className="font-semibold text-white">Actual: {actual.toFixed(1)} lbs</p>
       )}
+      {point.achievements?.map(m => (
+        <p key={m.weight} className="font-semibold text-emerald-300">✓ {m.weight} lbs milestone achieved</p>
+      ))}
       {pace != null && (
         <p className={isFuture ? 'font-semibold text-white' : 'text-slate-400'}>
           Target: {pace.toFixed(1)} lbs
@@ -39,22 +46,26 @@ const CustomTooltip = ({ active, payload }) => {
   )
 }
 
-export default function RegressionChart({ regressionData, color, goal, startWeight, goalDate, milestones }) {
+export default function RegressionChart({ regressionData, color, goal, startWeight, goalDate, milestones, achievements = [] }) {
   if (!regressionData) return null
 
   const { slope, intercept, originMs, windowLogs, allLogs } = regressionData
   const sourceLogs = allLogs ?? windowLogs
 
   // Chart bounds: first log → goalDate (or +3 months out if no goalDate)
-  const firstLogMs = new Date(sourceLogs[0].date).getTime()
+  const firstLogMs = dayMs(sourceLogs[0].date)
   let endMs
   if (goalDate) {
-    endMs = new Date(goalDate).getTime()
+    endMs = dayMs(goalDate)
   } else {
     const threeMonthsOut = new Date()
     threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3)
     endMs = threeMonthsOut.getTime()
   }
+  // Keep every actual weigh-in and upcoming milestone visible, even if the
+  // final goal date is stale or earlier than the next milestone.
+  endMs = Math.max(endMs, dayMs(sourceLogs[sourceLogs.length - 1].date),
+    ...(milestones ?? []).filter(m => m.date).map(m => dayMs(m.date)))
   const chartOriginMs = firstLogMs
   const totalDays = Math.max(1, (endMs - chartOriginMs) / 86400000)
   const days = Math.ceil(totalDays)
@@ -75,14 +86,15 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
   const datedMilestones = (milestones ?? [])
     .filter(m => m.date)
     .map(m => ({
-      x: (m.date.getTime() - chartOriginMs) / 86400000,
+      x: (dayMs(m.date) - chartOriginMs) / 86400000,
       y: m.weight,
       milestone: m,
     }))
     .filter(p => p.x >= 0 && p.x <= totalDays)
     .sort((a, b) => a.x - b.x)
   targetPoints.push(...datedMilestones)
-  if (goal != null) targetPoints.push({ x: totalDays, y: goal })
+  if (goal != null) targetPoints.push({ x: goalDate ? (dayMs(goalDate) - chartOriginMs) / 86400000 : totalDays, y: goal })
+  targetPoints.sort((a, b) => a.x - b.x)
   // De-duplicate consecutive points at same x (rare edge case)
   for (let i = targetPoints.length - 1; i > 0; i--) {
     if (targetPoints[i].x === targetPoints[i - 1].x) targetPoints.splice(i, 1)
@@ -112,8 +124,9 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
     const paceW   = paceAtDay(i)
     return {
       x:        i,
-      label:    new Date(dateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      label:    new Date(dateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
       actual:   actualW,
+      achievements: achievements.filter(m => m.hitDate === dateStr),
       pace:     paceW != null ? parseFloat(paceW.toFixed(1)) : null,
       regression: parseFloat((intercept + slope * (i - regOffsetDays)).toFixed(1)),
       inWindow: actualW != null && windowDateSet.has(dateStr),
@@ -128,7 +141,7 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
     const m = p.milestone
     const regAtMilestone = regressionAtDay(p.x)
     const onTrack = regAtMilestone <= p.y
-    const status = m.hit ? 'hit' : onTrack ? 'on-track' : 'behind'
+    const status = m.hitDate ? 'hit' : onTrack ? 'on-track' : 'behind'
     return { x: p.x, y: p.y, status, milestone: m }
   })
 
@@ -143,6 +156,11 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
 
   // X axis ticks
   const ticks = [0, Math.round(days / 3), Math.round(days * 2 / 3), days]
+  const achievementDays = [...new Set(achievements.map(m => m.hitDate))].map(date => ({
+    date,
+    x: (dayMs(date) - chartOriginMs) / 86400000,
+    y: actualByDate[date],
+  })).filter(p => p.y != null)
 
   // Custom dot for actual weigh-ins: bright if in 60-day window, dim if older
   const ActualDot = (props) => {
@@ -159,6 +177,8 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
   }
 
   return (
+    <div>
+    <p className="text-[10px] text-emerald-300 mb-2">✓ Achieved milestones are marked on the date first reached.</p>
     <ResponsiveContainer width="100%" height={180}>
       <ComposedChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -170,7 +190,7 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
           ticks={ticks}
           tickFormatter={x => {
             const d = new Date(chartOriginMs + x * 86400000)
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
           }}
           tick={{ fill: '#64748b', fontSize: 10 }}
         />
@@ -219,7 +239,6 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
           const fill = mk.status === 'hit'      ? '#10b981'   // emerald
                      : mk.status === 'on-track' ? '#34d399'   // lighter emerald
                      :                            '#ef4444'   // red — behind
-          const symbol = mk.status === 'hit' ? '✓' : null
           return (
             <ReferenceDot
               key={i}
@@ -230,16 +249,27 @@ export default function RegressionChart({ regressionData, color, goal, startWeig
               stroke="#0f172a"
               strokeWidth={2}
               ifOverflow="extendDomain"
-              label={symbol ? {
-                value: symbol,
-                fill: '#ffffff',
-                fontSize: 9,
-                fontWeight: 'bold',
-              } : undefined}
             />
           )
         })}
+        {achievementDays.map(p => (
+          <ReferenceDot key={p.date} x={p.x} y={p.y} r={8}
+            fill="#059669" stroke="#d1fae5" strokeWidth={2}
+            label={{ value: '✓', fill: '#ffffff', fontSize: 11, fontWeight: 'bold' }}
+          />
+        ))}
       </ComposedChart>
     </ResponsiveContainer>
+    {achievements.length > 0 ? (
+      <div className="mt-3 flex flex-wrap gap-2" aria-label="Achieved milestones">
+        {achievements.map(m => (
+          <span key={m.weight} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">
+            <span className="font-bold">✓ {m.weight} lbs</span> · {formatDate(m.hitDate)}
+          </span>
+        ))}
+      </div>
+    ) : <p className="mt-2 text-[11px] text-slate-500">No achieved milestones found in the available history yet.</p>}
+    <p className="mt-2 text-[10px] text-slate-500">Based on recorded weigh-ins and available milestone history; older milestone edits may be missing.</p>
+    </div>
   )
 }

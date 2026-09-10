@@ -1,4 +1,6 @@
 import { Redis } from '@upstash/redis'
+import { archiveMilestones } from '../src/utils/milestoneHistory.js'
+import { PARTICIPANTS, todayStr } from '../src/utils/calculations.js'
 
 const redis = Redis.fromEnv()
 
@@ -31,7 +33,11 @@ export default async function handler(req, res) {
     if (milestones && !Array.isArray(milestones)) {
       return res.status(400).json({ error: 'milestones must be an array' })
     }
-    const payload = JSON.stringify({ goal: goal ?? null, milestones: milestones ?? [] })
+    const stored = await redis.hget('goals', participant)
+    const previous = (typeof stored === 'string' ? JSON.parse(stored) : stored)
+      ?? PARTICIPANTS.find(p => p.id === participant) ?? {}
+    const milestoneHistory = archiveMilestones(previous, milestones ?? [], todayStr())
+    const payload = JSON.stringify({ goal: goal ?? null, milestones: milestones ?? [], milestoneHistory })
     await redis.hset('goals', { [participant]: payload })
     return res.json({ ok: true })
   }

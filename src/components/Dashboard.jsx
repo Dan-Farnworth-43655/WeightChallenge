@@ -363,6 +363,7 @@ function StatCardWithRegression({ stats }) {
           <p className="text-xs text-slate-500 mb-3">60-day regression trend</p>
           <RegressionChart
             regressionData={stats.regressionData}
+            achievements={stats.milestoneAchievements}
             color={stats.participant.color}
             goal={stats.goal}
             startWeight={stats.effectiveStart}
