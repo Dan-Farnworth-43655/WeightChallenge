@@ -35,5 +35,5 @@ for (const [id, start] of Object.entries({ javin: 214.2, dan: 198.3, paul: 233.4
   ])
   assert.equal(achievements.find(m => m.label === '8% in 8 weeks').hitDate, '2026-05-20')
 }
-assert.ok(!milestoneAchievements({ id: 'josh' }, [{ date: '2026-05-20', weight: 170 }]).some(m => m.label))
+assert.ok(!milestoneAchievements({ id: 'josh' }, [{ date: '2026-05-20', weight: 170 }]).some(m => m.label === '8% in 8 weeks'))
 console.log('Original 8% challenge: all three founders, exact threshold, start date, bounce-back, and Josh exclusion passed.')

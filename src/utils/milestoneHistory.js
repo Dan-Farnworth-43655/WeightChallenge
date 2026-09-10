@@ -35,6 +35,11 @@ export function milestoneAchievements(participant, logs) {
     }
   }
   const achievements = [...byWeight.values()]
+  for (const achievement of achievements) {
+    if (recovered.some(m => m.date === '2026-09-10' && m.weight === achievement.weight)) {
+      achievement.label = "Paul's Bday"
+    }
+  }
   const originalStart = ORIGINAL_CHALLENGE_START_WEIGHTS[participant.id]
   if (originalStart != null) {
     // Compare against the exact 8% threshold, rounding only the display.
