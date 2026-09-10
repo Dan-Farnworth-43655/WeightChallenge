@@ -9,6 +9,8 @@ export const RECOVERED_MILESTONES = {
 
 export const milestoneKey = m => `${m.weight}|${m.date ?? ''}`
 
+export const milestoneLabel = m => m.date === '2026-11-18' ? "Josh's bday" : m.label
+
 // Original launch configuration (commit 5d8dec6). Josh joined later and
 // was not a participant in the original 8%-in-8-weeks challenge.
 export const ORIGINAL_CHALLENGE_START_WEIGHTS = { javin: 214.2, dan: 198.3, paul: 233.4 }
@@ -31,7 +33,8 @@ export function milestoneAchievements(participant, logs) {
     if (!hit) continue
     const existing = byWeight.get(m.weight)
     if (!existing || hit.date < existing.hitDate) {
-      byWeight.set(m.weight, { weight: m.weight, hitDate: hit.date, actualWeight: hit.weight })
+      const label = milestoneLabel(m)
+      byWeight.set(m.weight, { weight: m.weight, hitDate: hit.date, actualWeight: hit.weight, ...(label ? { label } : {}) })
     }
   }
   const achievements = [...byWeight.values()]

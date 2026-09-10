@@ -1,4 +1,4 @@
-import { milestoneAchievements } from './milestoneHistory.js'
+import { milestoneAchievements, milestoneLabel } from './milestoneHistory.js'
 
 // Participant configuration — each person has their own goal and milestones.
 // Goals: { weight, date }. Milestones: array of { weight, date } (date optional).
@@ -229,6 +229,7 @@ export function computeStats(participant, logs) {
       : 0
     return {
       weight: m.weight,
+      label: milestoneLabel(m),
       date: targetDate,
       dateStr: m.date ?? null,
       hit,
